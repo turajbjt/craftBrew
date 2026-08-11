@@ -1,6 +1,6 @@
 <?php
 /**
- * Plug'n'Pay (PnP) API Service Driver
+ * Plug'n Pay (PnP) API Service Driver
  */
 
 require_once __DIR__ . '/../config.php';

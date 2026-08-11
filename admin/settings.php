@@ -161,7 +161,7 @@ $currentSettings = SettingsService::getAll();
 
 <div style="margin-bottom: 30px;">
     <h1 style="font-family: 'Outfit', sans-serif; font-size: 2rem; font-weight: 700;">System & Gateway Settings</h1>
-    <p style="color: var(--text-muted);">Manage Plug'n'Pay API credentials, sandbox testing mode, notification alerts, and application parameters.</p>
+    <p style="color: var(--text-muted);">Manage Plug'n Pay API credentials, sandbox testing mode, notification alerts, and application parameters.</p>
 </div>
 
 <?php if ($actionMsg): ?>
@@ -179,17 +179,17 @@ $currentSettings = SettingsService::getAll();
 <form method="POST">
     <div class="settings-grid">
         
-        <!-- Plug'n'Pay Credentials Card -->
+        <!-- Plug'n Pay Credentials Card -->
         <div class="settings-card">
             <div class="card-title">
-                💳 Plug'n'Pay Gateway Credentials
+                💳 Plug'n Pay Gateway Credentials
             </div>
 
             <div class="form-group">
                 <label>Publisher Name (Merchant Account ID)</label>
                 <input type="text" name="pnp_publisher_name" class="form-control" required
                        value="<?= htmlspecialchars($currentSettings['pnp_publisher_name'] ?? PNP_PUBLISHER_NAME) ?>">
-                <div class="help-text">Assigned Plug'n'Pay publisher ID (e.g. <code>demo_publisher</code>).</div>
+                <div class="help-text">Assigned Plug'n Pay publisher ID (e.g. <code>demo_publisher</code>).</div>
             </div>
 
             <div class="form-group">
@@ -246,10 +246,10 @@ $currentSettings = SettingsService::getAll();
             </div>
         </div>
 
-        <!-- Plug'n'Pay Endpoint URLs Card -->
+        <!-- Plug'n Pay Endpoint URLs Card -->
         <div class="settings-card">
             <div class="card-title">
-                🌐 Plug'n'Pay API Endpoints
+                🌐 Plug'n Pay API Endpoints
             </div>
 
             <div class="form-group">

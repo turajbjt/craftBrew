@@ -17,7 +17,7 @@ if (!empty($orderId)) {
 ?>
 
 <div style="margin-bottom: 25px;">
-    <h1 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700;">Plug'n'Pay API Query Tool</h1>
+    <h1 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700;">Plug'n Pay API Query Tool</h1>
     <p style="color: var(--text-muted);">Execute manual query_trans mode lookups directly against payment gateway records by Order ID.</p>
 </div>
 

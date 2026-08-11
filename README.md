@@ -1,4 +1,4 @@
-# Plug'n'Pay (PnP) SaaS Recurring Billing & Management Portal
+# Plug'n Pay (PnP) SaaS Recurring Billing & Management Portal
 
 A self-contained, enterprise-grade PHP & MySQL platform for collecting card subscriptions via **Smart Screens v2**, automated 2x-daily recurring billing processing (**`sendbill.php`**), role-based administrative portal, visual dashboard analytics, data export, manual API queries, and automated End-of-Day transaction reconciliation (**`eod_check.php`**).
 
@@ -121,8 +121,8 @@ Edit `config.php` (or pass environment variables to your PHP runtime):
 | `DB_NAME` | `recurring_mgt` | Database Name |
 | `DB_USER` | `root` | Database Username |
 | `DB_PASS` | `rootpassword` | Database Password |
-| `PNP_PUBLISHER_NAME` | `demo_publisher` | Plug'n'Pay Publisher Name |
-| `PNP_API_KEY` | `demo_api_key_12345` | Plug'n'Pay Remote API Key |
+| `PNP_PUBLISHER_NAME` | `demo_publisher` | Plug'n Pay Publisher Name |
+| `PNP_API_KEY` | `demo_api_key_12345` | Plug'n Pay Remote API Key |
 | `PNP_MOCK_MODE` | `true` | Sandbox mode toggle for offline testing |
 | `ALERT_EMAIL_FROM` | `billing-alerts@example.com` | Notification sender email address |
 | `ALERT_EMAIL_TO` | `merchant-admin@example.com` | Notification recipient email address |
