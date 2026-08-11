@@ -10,22 +10,36 @@ class PnpApiService {
     /**
      * Generate Smart Screens v2 hosted payment URL or parameters
      */
-    public static function getSmartScreensIframeUrl(array $planDetails, string $customOrderId = ''): string {
+    public static function getSmartScreensIframeUrl(array $planDetails, string $customOrderId = '', array $customerData = []): string {
         if (empty($customOrderId)) {
             $customOrderId = 'SS-' . date('YmdHis') . '-' . rand(1000, 9999);
         }
+
+        $initialAmount = number_format((float)($planDetails['initial_amount'] ?? 0), 2, '.', '');
+        $recurringAmount = number_format((float)($planDetails['recurringfee'] ?? 0), 2, '.', '');
+
         $params = [
-            'publisher-name' => PNP_PUBLISHER_NAME,
-            'order-id'       => $customOrderId,
-            'planid'         => $planDetails['planid'] ?? '',
-            'card-amount'    => number_format((float)($planDetails['initial_amount'] ?? 0), 2, '.', ''),
-            'currency'       => $planDetails['currency'] ?? 'USD',
-            'easycart'       => '1',
-            'mode'           => 'auth',
-            'recurring'      => 'init', // Initial recurring setup flag
-            'callback_url'   => APP_URL . '/callback.php',
-            'return_url'     => APP_URL . '/callback.php?status=success',
+            'pt_gateway_account'                => PNP_PUBLISHER_NAME,
+            'pt_order_classifier'               => $customOrderId,
+            'pr_plan_id'                        => $planDetails['planid'] ?? '',
+            'pr_recurring_amount'               => $recurringAmount,
+            'pt_transaction_amount'             => $initialAmount,
+            'pt_item_cost_1'                    => $initialAmount,
+            'pt_item_description_1'             => $planDetails['description'] ?? 'Subscription',
+            'pt_item_identifier_1'              => $planDetails['purchaseid'] ?? ($planDetails['planid'] ?? 'SUB-PLAN'),
+            'pt_item_quantity_1'                => '1',
+            'pt_item_is_taxable_1'              => 'no',
+            'pd_collect_credentials'            => 'yes',
+            'pd_display_items'                  => 'yes',
+            'pb_cards_allowed'                  => 'visa,mastercard,amex,discover',
+            'pt_customer_username'              => $customerData['username'] ?? '',
+            'pb_customer_password'              => $customerData['password'] ?? '',
+            'pb_customer_password_confirmation' => $customerData['password'] ?? '',
+            'pt_account_code_1'                 => $planDetails['purchaseid'] ?? '',
+            'callback_url'                      => APP_URL . '/callback.php',
+            'return_url'                        => APP_URL . '/callback.php?status=success',
         ];
+
         return PNP_SMART_SCREENS_URL . '?' . http_build_query($params);
     }
 
