@@ -16,23 +16,9 @@ define('DB_NAME', getenv('DB_NAME') ?: 'recurring_mgt');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: 'rootpassword');
 
-// Plug'n'Pay (PnP) API Settings
-define('PNP_PUBLISHER_NAME', getenv('PNP_PUBLISHER_NAME') ?: 'demo_publisher');
-define('PNP_API_KEY', getenv('PNP_API_KEY') ?: 'demo_api_key_12345');
-define('PNP_AUTHPREV_URL', getenv('PNP_AUTHPREV_URL') ?: 'https://pay1.plugnpay.com/payment/pnpremote.cgi');
-define('PNP_BATCH_UPLOAD_URL', getenv('PNP_BATCH_UPLOAD_URL') ?: 'https://pay1.plugnpay.com/payment/batchupload.cgi');
-define('PNP_QUERY_TRANS_URL', getenv('PNP_QUERY_TRANS_URL') ?: 'https://pay1.plugnpay.com/payment/querytrans.cgi');
-define('PNP_SMART_SCREENS_URL', getenv('PNP_SMART_SCREENS_URL') ?: 'https://pay1.plugnpay.com/smartscreens/v2/index.cgi');
-define('PNP_MOCK_MODE', getenv('PNP_MOCK_MODE') !== false ? filter_var(getenv('PNP_MOCK_MODE'), FILTER_VALIDATE_BOOLEAN) : true);
-
-// Notification Settings
-define('ALERT_EMAIL_FROM', getenv('ALERT_EMAIL_FROM') ?: 'billing-alerts@example.com');
-define('ALERT_EMAIL_TO', getenv('ALERT_EMAIL_TO') ?: 'merchant-admin@example.com');
-define('SEND_EMAIL_NOTIFICATIONS', true);
-
-// Application Settings
-define('APP_NAME', 'SaaS Recurring Billing & Management Portal');
-define('APP_URL', getenv('APP_URL') ?: 'http://localhost:8080');
+// Initialize dynamic settings service
+require_once __DIR__ . '/includes/SettingsService.php';
+SettingsService::initConstants();
 
 // Date & Time Utility Functions
 function get_gmt_now_formatted() {

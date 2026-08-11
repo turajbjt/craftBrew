@@ -109,3 +109,25 @@ VALUES
 -- Seed Initial Owner User (Username: admin, Password: adminPassword123!)
 INSERT OR IGNORE INTO users (username, password_hash, email, role, status)
 VALUES ('admin', '$2y$10$abcdefghijklmnopqrstuuV1FlKZj8phOjK35nHX/CZYJVSeP9mmW', 'owner@example.com', 'owner', 'active');
+
+-- Table: system_settings
+CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Seed System Settings
+INSERT OR IGNORE INTO system_settings (setting_key, setting_value) VALUES
+('pnp_publisher_name', 'demo_publisher'),
+('pnp_api_key', 'demo_api_key_12345'),
+('pnp_mock_mode', 'true'),
+('pnp_authprev_url', 'https://pay1.plugnpay.com/payment/pnpremote.cgi'),
+('pnp_batch_upload_url', 'https://pay1.plugnpay.com/payment/batchupload.cgi'),
+('pnp_query_trans_url', 'https://pay1.plugnpay.com/payment/querytrans.cgi'),
+('pnp_smart_screens_url', 'https://pay1.plugnpay.com/smartscreens/v2/index.cgi'),
+('alert_email_from', 'billing-alerts@example.com'),
+('alert_email_to', 'merchant-admin@example.com'),
+('send_email_notifications', 'true'),
+('app_name', 'SaaS Recurring Billing & Management Portal'),
+('app_url', 'http://localhost:8080');

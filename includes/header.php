@@ -152,6 +152,9 @@ $currentScript = basename($_SERVER['PHP_SELF']);
         <li><a href="/admin/history.php" class="<?= $currentScript === 'history.php' ? 'active' : '' ?>">📜 Reports & History</a></li>
         <li><a href="/admin/query_trans.php" class="<?= $currentScript === 'query_trans.php' ? 'active' : '' ?>">🔍 API Query</a></li>
         <li><a href="/admin/export.php" class="<?= $currentScript === 'export.php' ? 'active' : '' ?>">📥 Export Data</a></li>
+        <?php if (in_array($user['role'], ['owner', 'manager'], true)): ?>
+            <li><a href="/admin/settings.php" class="<?= $currentScript === 'settings.php' ? 'active' : '' ?>">⚙️ Settings</a></li>
+        <?php endif; ?>
         <?php if ($user['role'] === 'owner'): ?>
             <li><a href="/admin/users.php" class="<?= $currentScript === 'users.php' ? 'active' : '' ?>">🔐 Sub-Logins & Audits</a></li>
         <?php endif; ?>
