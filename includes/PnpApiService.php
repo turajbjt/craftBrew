@@ -44,13 +44,13 @@ class PnpApiService {
     }
 
     /**
-     * Perform Single Authprev Payment against Card-on-File
+     * Perform Single Card-on-File Recurring Charge via Remote API (bill_member mode)
      */
-    public static function processSingleAuthprev(array $profile, float $amount): array {
+    public static function processBillMember(array $profile, float $amount): array {
         if (PNP_MOCK_MODE) {
             // Mock API response
             $isSuccess = true;
-            $newOrderId = 'AUTHPREV-' . date('YmdHis') . '-' . rand(100, 999);
+            $newOrderId = 'BILLMEM-' . date('YmdHis') . '-' . rand(100, 999);
             return [
                 'success'        => $isSuccess,
                 'orderID'        => $newOrderId,
@@ -62,16 +62,23 @@ class PnpApiService {
         }
 
         $payload = [
-            'publisher-name' => PNP_PUBLISHER_NAME,
+            'publisher-name'     => PNP_PUBLISHER_NAME,
             'publisher-password' => PNP_API_KEY,
-            'mode'           => 'authprev',
-            'prevorderid'    => $profile['orderid'],
-            'card-amount'    => number_format($amount, 2, '.', ''),
-            'currency'       => $profile['currency'] ?? 'USD',
-            'cof_indicator'  => 'R', // Recurring COF flag
+            'mode'               => 'bill_member',
+            'username'           => !empty($profile['username']) ? $profile['username'] : $profile['saas_id'],
+            'card-amount'        => number_format($amount, 2, '.', ''),
+            'currency'           => $profile['currency'] ?? 'USD',
+            'transflags'         => 'cit,recurring',
         ];
 
         return self::executeHttpCall(PNP_AUTHPREV_URL, $payload);
+    }
+
+    /**
+     * Perform Single Authprev / COF Payment (Alias to processBillMember)
+     */
+    public static function processSingleAuthprev(array $profile, float $amount): array {
+        return self::processBillMember($profile, $amount);
     }
 
     /**
