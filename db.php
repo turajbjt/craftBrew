@@ -22,8 +22,22 @@ class Database {
                 if ($engine === 'sqlite') {
                     $sqlitePath = defined('DB_SQLITE_PATH') ? DB_SQLITE_PATH : __DIR__ . '/data/recurring_mgt.sqlite';
                     $dbDir = dirname($sqlitePath);
+
                     if (!is_dir($dbDir)) {
-                        @mkdir($dbDir, 0755, true);
+                        if (!@mkdir($dbDir, 0777, true) && !is_dir($dbDir)) {
+                            die("Database Error: Unable to create database directory '{$dbDir}'. Please check folder permissions.\n");
+                        }
+                    }
+
+                    // Ensure write permissions on database folder for web server process
+                    @chmod($dbDir, 0777);
+
+                    $isNewDatabase = !file_exists($sqlitePath) || filesize($sqlitePath) === 0;
+
+                    if (!file_exists($sqlitePath)) {
+                        if (@touch($sqlitePath)) {
+                            @chmod($sqlitePath, 0666);
+                        }
                     }
 
                     $dsn = 'sqlite:' . $sqlitePath;
@@ -32,7 +46,7 @@ class Database {
 
                     // Auto-initialize SQLite schema if tables do not exist yet
                     $checkTable = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")->fetch();
-                    if (!$checkTable) {
+                    if (!$checkTable || $isNewDatabase) {
                         self::initSqliteDatabase(self::$instance);
                     }
                 } else {
