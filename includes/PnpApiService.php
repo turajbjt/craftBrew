@@ -196,6 +196,62 @@ class PnpApiService {
     }
 
     /**
+     * List Members Remote API (list_members mode)
+     * Specification: https://docs.plugnpay.com/docs/integration-specifications-documents/remote-api-integration-specification/section-3.-remote-membership-administration/membership-management---list-members/
+     * Note: crypt field defaults to 'omit' to prevent generating hashes.
+     */
+    public static function listMembers(string $status = 'active', string $crypt = 'omit', ?int $expcc = null): array {
+        if (PNP_MOCK_MODE) {
+            return [
+                'success'      => true,
+                'status'       => 'success',
+                'TranCount'    => 2,
+                'records'      => [
+                    [
+                        'username'   => 'janedoe',
+                        'enddate'    => date('Ymd', strtotime('+30 days')),
+                        'purchaseid' => 'GROUP-PRO'
+                    ],
+                    [
+                        'username'   => 'johnsmith',
+                        'enddate'    => date('Ymd', strtotime('+15 days')),
+                        'purchaseid' => 'GROUP-BASIC'
+                    ]
+                ],
+                'raw_response' => 'FinalStatus=success&TranCount=2&a00000=username%3Djanedoe%26enddate%3D20260910&a00001=username%3Djohnsmith%26enddate%3D20260826'
+            ];
+        }
+
+        $payload = [
+            'publisher-name'     => PNP_PUBLISHER_NAME,
+            'publisher-password' => PNP_API_KEY,
+            'mode'               => 'list_members',
+            'status'             => $status,
+            'crypt'              => $crypt, // Set to 'omit' per spec requirement to skip password generation
+        ];
+
+        if ($expcc !== null && in_array($expcc, [1, 2, 3], true)) {
+            $payload['expcc'] = (string)$expcc;
+        }
+
+        $res = self::executeHttpCall(PNP_AUTHPREV_URL, $payload);
+
+        if (!empty($res['parsed'])) {
+            $records = [];
+            foreach ($res['parsed'] as $key => $val) {
+                if (preg_match('/^a\d{5}$/', $key)) {
+                    parse_str($val, $subParsed);
+                    $records[] = $subParsed;
+                }
+            }
+            $res['records'] = $records;
+            $res['TranCount'] = (int)($res['parsed']['TranCount'] ?? count($records));
+        }
+
+        return $res;
+    }
+
+    /**
      * Helper to execute HTTP POST requests via cURL
      */
     private static function executeHttpCall(string $url, array $payload): array {
