@@ -305,6 +305,63 @@ class PnpApiService {
     }
 
     /**
+     * Query Member Billing History Remote API (query_billing mode)
+     * Specification: https://docs.plugnpay.com/docs/integration-specifications-documents/remote-api-integration-specification/section-3.-remote-membership-administration/membership-administration---query-member-billing-history/
+     * Handles double URL-encoded DRXXXXXX record formatting per specification Note #4.
+     */
+    public static function queryMemberBillingHistory(string $username, string $startDate = '', string $endDate = ''): array {
+        if (empty($startDate)) {
+            $startDate = date('Ymd', strtotime('-120 days'));
+        }
+        if (empty($endDate)) {
+            $endDate = date('Ymd');
+        }
+
+        if (PNP_MOCK_MODE) {
+            return [
+                'success'      => true,
+                'status'       => 'success',
+                'username'     => $username,
+                'records'      => [
+                    [
+                        'trans_date' => date('YmdHis', strtotime('-30 days')),
+                        'amount'     => '79.99',
+                        'result'     => 'success',
+                        'orderid'    => 'REC-MOCK-101'
+                    ]
+                ],
+                'raw_response' => 'FinalStatus=success&DR000000=' . urlencode(urlencode('trans_date=' . date('YmdHis', strtotime('-30 days')) . '&amount=79.99&result=success&orderid=REC-MOCK-101'))
+            ];
+        }
+
+        $payload = [
+            'publisher-name'     => PNP_PUBLISHER_NAME,
+            'publisher-password' => PNP_API_KEY,
+            'mode'               => 'query_billing',
+            'username'           => $username,
+            'startdate'          => $startDate,
+            'enddate'            => $endDate,
+        ];
+
+        $res = self::executeHttpCall(PNP_AUTHPREV_URL, $payload);
+
+        if (!empty($res['parsed'])) {
+            $records = [];
+            foreach ($res['parsed'] as $key => $val) {
+                if (preg_match('/^DR\d{6}$/', $key)) {
+                    // Double urldecode as specified in Plug'n Pay documentation Note #4
+                    $decodedTwice = urldecode(urldecode($val));
+                    parse_str($decodedTwice, $subParsed);
+                    $records[] = $subParsed;
+                }
+            }
+            $res['records'] = $records;
+        }
+
+        return $res;
+    }
+
+    /**
      * Helper to execute HTTP POST requests via cURL
      */
     private static function executeHttpCall(string $url, array $payload): array {
