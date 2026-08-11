@@ -228,6 +228,7 @@ class PnpApiService {
             'mode'               => 'list_members',
             'status'             => $status,
             'crypt'              => $crypt, // Set to 'omit' per spec requirement to skip password generation
+            'adddata'            => 'yes',  // Extended data toggle (returns customer name, etc.)
         ];
 
         if ($expcc !== null && in_array($expcc, [1, 2, 3], true)) {
