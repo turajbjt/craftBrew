@@ -14,62 +14,72 @@ $isAuditor = ($user['role'] === 'auditor');
 $actionMsg = null;
 $errorMsg = null;
 
-// Handle Actions (Manual Charge, Edit Profile, Disable Recurring, Delete Profile, Send Email)
+// Handle Actions (Manual Charge, Edit Profile, Disable Recurring, Delete Profile, Send Email, Resync Gateway)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAuditor) {
     $action = $_POST['action'] ?? '';
-    $targetSaasId = $_POST['saas_id'] ?? '';
 
-    $customer = CustomerService::getCustomerBySaasId($targetSaasId);
+    if ($action === 'resync_gateway') {
+        $syncRes = CustomerService::syncMembersFromGateway($user['username']);
+        audit_log('gateway_resync', "Triggered gateway resync via list_members API");
+        if ($syncRes['success']) {
+            $actionMsg = $syncRes['message'];
+        } else {
+            $errorMsg = $syncRes['message'];
+        }
+    } else {
+        $targetSaasId = $_POST['saas_id'] ?? '';
+        $customer = CustomerService::getCustomerBySaasId($targetSaasId);
 
-    if ($customer) {
-        if ($action === 'manual_charge') {
-            $amount = (float)($_POST['amount'] ?? $customer['recurringfee']);
-            if ($amount > 0) {
-                $chargeResult = PnpApiService::processSingleAuthprev($customer, $amount);
-                CustomerService::recordRecurringResult($customer, $chargeResult, $user['username']);
-                audit_log('manual_charge', "Processed manual authprev charge of $$amount for SaaS ID $targetSaasId");
-                $actionMsg = "Manual authprev charge processed! Result: " . strtoupper($chargeResult['result']);
-            } else {
-                $errorMsg = "Invalid charge amount.";
-            }
-        } elseif ($action === 'disable_recurring') {
-            CustomerService::disableRecurring($targetSaasId, $user['username']);
-            audit_log('disable_recurring', "Disabled recurring billing for SaaS ID $targetSaasId");
-            $actionMsg = "Recurring billing disabled for customer $targetSaasId.";
-        } elseif ($action === 'delete_profile') {
-            CustomerService::deleteCustomer($targetSaasId, $user['username']);
-            audit_log('delete_customer', "Deleted customer profile $targetSaasId");
-            $actionMsg = "Customer profile $targetSaasId deleted successfully.";
-        } elseif ($action === 'edit_profile') {
-            $pdo = Database::getConnection();
-            $stmt = $pdo->prepare("
-                UPDATE customer_profiles SET 
-                    card_name = ?, email = ?, phone = ?, 
-                    enddate = ?, billcycle = ?, billcycle_type = ?, 
-                    status = ?, acct_code = ?, acct_code2 = ?
-                WHERE saas_id = ?
-            ");
-            $stmt->execute([
-                trim($_POST['card_name']),
-                trim($_POST['email']),
-                trim($_POST['phone']),
-                trim($_POST['enddate']),
-                (int)$_POST['billcycle'],
-                trim($_POST['billcycle_type']),
-                trim($_POST['status']),
-                trim($_POST['acct_code']),
-                trim($_POST['acct_code2']),
-                $targetSaasId
-            ]);
-            audit_log('edit_customer', "Updated details for customer $targetSaasId");
-            $actionMsg = "Customer profile updated successfully.";
-        } elseif ($action === 'send_credentials') {
-            if (!empty($customer['username'])) {
-                EmailService::sendCredentialsEmail($customer['email'], $customer['username'], '*** Encrypted ***');
-                audit_log('send_credentials', "Sent credentials email to " . $customer['email']);
-                $actionMsg = "Credentials email dispatched to " . htmlspecialchars($customer['email']) . ".";
-            } else {
-                $errorMsg = "No username stored for this customer profile.";
+        if ($customer) {
+            if ($action === 'manual_charge') {
+                $amount = (float)($_POST['amount'] ?? $customer['recurringfee']);
+                if ($amount > 0) {
+                    $chargeResult = PnpApiService::processSingleAuthprev($customer, $amount);
+                    CustomerService::recordRecurringResult($customer, $chargeResult, $user['username']);
+                    audit_log('manual_charge', "Processed manual authprev charge of $$amount for SaaS ID $targetSaasId");
+                    $actionMsg = "Manual authprev charge processed! Result: " . strtoupper($chargeResult['result']);
+                } else {
+                    $errorMsg = "Invalid charge amount.";
+                }
+            } elseif ($action === 'disable_recurring') {
+                CustomerService::disableRecurring($targetSaasId, $user['username']);
+                audit_log('disable_recurring', "Disabled recurring billing for SaaS ID $targetSaasId");
+                $actionMsg = "Recurring billing disabled for customer $targetSaasId.";
+            } elseif ($action === 'delete_profile') {
+                CustomerService::deleteCustomer($targetSaasId, $user['username']);
+                audit_log('delete_customer', "Deleted customer profile $targetSaasId");
+                $actionMsg = "Customer profile $targetSaasId deleted successfully.";
+            } elseif ($action === 'edit_profile') {
+                $pdo = Database::getConnection();
+                $stmt = $pdo->prepare("
+                    UPDATE customer_profiles SET 
+                        card_name = ?, email = ?, phone = ?, 
+                        enddate = ?, billcycle = ?, billcycle_type = ?, 
+                        status = ?, acct_code = ?, acct_code2 = ?
+                    WHERE saas_id = ?
+                ");
+                $stmt->execute([
+                    trim($_POST['card_name']),
+                    trim($_POST['email']),
+                    trim($_POST['phone']),
+                    trim($_POST['enddate']),
+                    (int)$_POST['billcycle'],
+                    trim($_POST['billcycle_type']),
+                    trim($_POST['status']),
+                    trim($_POST['acct_code']),
+                    trim($_POST['acct_code2']),
+                    $targetSaasId
+                ]);
+                audit_log('edit_customer', "Updated details for customer $targetSaasId");
+                $actionMsg = "Customer profile updated successfully.";
+            } elseif ($action === 'send_credentials') {
+                if (!empty($customer['username'])) {
+                    EmailService::sendCredentialsEmail($customer['email'], $customer['username'], '*** Encrypted ***');
+                    audit_log('send_credentials', "Sent credentials email to " . $customer['email']);
+                    $actionMsg = "Credentials email dispatched to " . htmlspecialchars($customer['email']) . ".";
+                } else {
+                    $errorMsg = "No username stored for this customer profile.";
+                }
             }
         }
     }
@@ -98,6 +108,41 @@ $customers = $stmt->fetchAll();
 
 <style>
     .search-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .search-input {
+        flex: 1;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        color: var(--text-main);
+        font-size: 0.95rem;
+    }
+    .search-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Customer Profiles</h1>
+        <p style="color: var(--text-muted); margin: 4px 0 0 0;">Lookup, edit, run manual COF charges, or manage subscription cycles.</p>
+    </div>
+    <?php if (!$isAuditor): ?>
+        <form method="POST" style="margin: 0;" onsubmit="return confirm('Trigger Remote API list_members sync to update all customer records from Plug\'n Pay gateway?');">
+            <input type="hidden" name="action" value="resync_gateway">
+            <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; font-weight: 600; cursor: pointer; padding: 10px 18px; border-radius: 8px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Resync Gateway Profiles
+            </button>
+        </form>
+    <?php endif; ?>
+</div>
         display: flex;
         gap: 12px;
         margin-bottom: 25px;
@@ -195,9 +240,20 @@ $customers = $stmt->fetchAll();
     }
 </style>
 
-<div style="margin-bottom: 25px;">
-    <h1 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700;">Customer Profiles</h1>
-    <p style="color: var(--text-muted);">Lookup, edit, run manual COF charges, or manage subscription cycles.</p>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <h1 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700; margin: 0;">Customer Profiles</h1>
+        <p style="color: var(--text-muted); margin: 4px 0 0 0;">Lookup, edit, run manual COF charges, or manage subscription cycles.</p>
+    </div>
+    <?php if (!$isAuditor): ?>
+        <form method="POST" action="/admin/customers.php" style="margin: 0;" onsubmit="return confirm('Trigger Remote API list_members sync to update all customer records from Plug\'n Pay gateway?');">
+            <input type="hidden" name="action" value="resync_gateway">
+            <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; font-weight: 600; cursor: pointer; padding: 10px 18px; border-radius: 8px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Resync Gateway Profiles
+            </button>
+        </form>
+    <?php endif; ?>
 </div>
 
 <?php if ($actionMsg): ?>

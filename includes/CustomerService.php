@@ -359,9 +359,84 @@ class CustomerService {
             'cancelled_customers' => $cancelledCustomers,
             'mrr'                 => $mrr,
             'total_revenue'       => $totalRevenue,
+            'success_rate'        => $successRate,
             'success_charges'     => $successCharges,
-            'failed_charges'      => $failedCharges,
-            'success_rate'        => $successRate
+            'failed_charges'      => $failedCharges
+        ];
+    }
+
+    /**
+     * Resync all customer records with Plug'n Pay gateway via list_members Remote API
+     */
+    public static function syncMembersFromGateway(string $actorUsername = 'SYSTEM'): array {
+        require_once __DIR__ . '/PnpApiService.php';
+        $res = PnpApiService::listMembers('all', 'omit', null);
+
+        if (!$res['success'] || empty($res['records'])) {
+            return [
+                'success' => false,
+                'count'   => 0,
+                'message' => $res['error_message'] ?? 'No member records retrieved from Plug\'n Pay.'
+            ];
+        }
+
+        $pdo = Database::getConnection();
+        $updatedCount = 0;
+        $gmtNow = get_gmt_now_formatted();
+
+        foreach ($res['records'] as $record) {
+            $username = trim($record['username'] ?? '');
+            if (empty($username)) continue;
+
+            // Find customer by username
+            $stmt = $pdo->prepare("SELECT * FROM customer_profiles WHERE username = ?");
+            $stmt->execute([$username]);
+            $customer = $stmt->fetch();
+
+            if ($customer) {
+                $updates = [];
+                $params = [];
+
+                if (!empty($record['enddate']) && strlen($record['enddate']) === 8) {
+                    $updates[] = "enddate = ?";
+                    $params[] = $record['enddate'];
+                }
+                if (!empty($record['status'])) {
+                    $statusVal = strtolower($record['status']);
+                    $updates[] = "status = ?";
+                    $params[] = ($statusVal === 'active' || $statusVal === 'cancelled' || $statusVal === 'expired') ? $statusVal : $customer['status'];
+                }
+                if (!empty($record['card_name']) || !empty($record['name'])) {
+                    $nameVal = trim($record['card_name'] ?? $record['name'] ?? '');
+                    if (!empty($nameVal)) {
+                        $updates[] = "card_name = ?";
+                        $params[] = $nameVal;
+                    }
+                }
+
+                if (!empty($updates)) {
+                    $params[] = $customer['saas_id'];
+                    $sql = "UPDATE customer_profiles SET " . implode(', ', $updates) . " WHERE saas_id = ?";
+                    $stmtUpd = $pdo->prepare($sql);
+                    $stmtUpd->execute($params);
+
+                    // Service history log
+                    $stmtSvc = $pdo->prepare("
+                        INSERT INTO service_history (saas_id, datetime, action, reason, actor_username)
+                        VALUES (?, ?, 'gateway_resync', 'Customer record resynced via list_members Remote API', ?)
+                    ");
+                    $stmtSvc->execute([$customer['saas_id'], $gmtNow, $actorUsername]);
+
+                    $updatedCount++;
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'count'   => $updatedCount,
+            'total'   => count($res['records']),
+            'message' => "Resynced $updatedCount customer profile(s) out of " . count($res['records']) . " record(s) from Plug'n Pay gateway."
         ];
     }
 }
