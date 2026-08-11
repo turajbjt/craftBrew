@@ -137,8 +137,16 @@ class PnpApiService {
 
     /**
      * Query Transaction Status (query_trans mode) by Order ID
+     * Specification: https://docs.plugnpay.com/docs/integration-specifications-documents/remote-api-integration-specification/section-2.-remote-transaction-administration/transaction-administration---query-transaction/
      */
-    public static function queryTransaction(string $orderId): array {
+    public static function queryTransaction(string $orderId, string $startDate = '', string $endDate = ''): array {
+        if (empty($startDate)) {
+            $startDate = date('Ymd', strtotime('-30 days'));
+        }
+        if (empty($endDate)) {
+            $endDate = date('Ymd');
+        }
+
         if (PNP_MOCK_MODE) {
             return [
                 'success'      => true,
@@ -149,7 +157,7 @@ class PnpApiService {
                 'trans_date'   => date('YmdHis'),
                 'auth_code'    => 'MOCK' . rand(1000, 9999),
                 'response_text'=> 'Transaction Approved (Mock Query)',
-                'raw_response' => "FinalStatus=success&OrderNumber=$orderId&Amount=29.99"
+                'raw_response' => "FinalStatus=success&success=yes&orderID=$orderId&card-amount=29.99"
             ];
         }
 
@@ -157,10 +165,34 @@ class PnpApiService {
             'publisher-name'     => PNP_PUBLISHER_NAME,
             'publisher-password' => PNP_API_KEY,
             'mode'               => 'query_trans',
-            'orderid'            => $orderId,
+            'orderID'            => $orderId,
+            'startdate'          => $startDate,
+            'enddate'            => $endDate,
         ];
 
-        return self::executeHttpCall(PNP_QUERY_TRANS_URL, $payload);
+        $res = self::executeHttpCall(PNP_QUERY_TRANS_URL, $payload);
+        
+        // Parse individual transaction records returned in a00001, a00002...
+        if (!empty($res['parsed'])) {
+            $records = [];
+            foreach ($res['parsed'] as $key => $val) {
+                if (preg_match('/^a\d{5}$/', $key)) {
+                    parse_str($val, $subParsed);
+                    $records[] = $subParsed;
+                }
+            }
+            if (!empty($records)) {
+                $res['records'] = $records;
+                if (isset($records[0]['card-amount'])) {
+                    $res['amount'] = (float)$records[0]['card-amount'];
+                }
+                if (isset($records[0]['auth-code'])) {
+                    $res['auth_code'] = $records[0]['auth-code'];
+                }
+            }
+        }
+
+        return $res;
     }
 
     /**
