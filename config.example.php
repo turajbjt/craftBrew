@@ -17,9 +17,9 @@ define('DB_PASS', 'secretpassword');
 define('PNP_PUBLISHER_NAME', 'your_publisher_name');
 define('PNP_API_KEY', 'your_api_key');
 define('PNP_AUTHPREV_URL', 'https://pay1.plugnpay.com/payment/pnpremote.cgi');
-define('PNP_BATCH_UPLOAD_URL', 'https://pay1.plugnpay.com/payment/batchupload.cgi');
-define('PNP_QUERY_TRANS_URL', 'https://pay1.plugnpay.com/payment/querytrans.cgi');
-define('PNP_SMART_SCREENS_URL', 'https://pay1.plugnpay.com/smartscreens/v2/index.cgi');
+define('PNP_BATCH_UPLOAD_URL', 'https://pay1.plugnpay.com/payment/pnpremote.cgi');
+define('PNP_QUERY_TRANS_URL', 'https://pay1.plugnpay.com/payment/pnpremote.cgi');
+define('PNP_SMART_SCREENS_URL', 'https://pay1.plugnpay.com/pay/');
 define('PNP_MOCK_MODE', false);
 
 define('ALERT_EMAIL_FROM', 'billing-alerts@example.com');
