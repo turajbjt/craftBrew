@@ -280,6 +280,31 @@ class PnpApiService {
     }
 
     /**
+     * Cancel Member Profile Remote API (cancel_member mode)
+     * Specification: https://docs.plugnpay.com/docs/integration-specifications-documents/remote-api-integration-specification/section-3.-remote-membership-administration/membership-administration---cancel-member/
+     */
+    public static function cancelMember(string $username): array {
+        if (PNP_MOCK_MODE) {
+            return [
+                'success'       => true,
+                'status'        => 'success',
+                'username'      => $username,
+                'auth-msg'      => 'Member profile cancelled successfully (Mock)',
+                'raw_response'  => "FinalStatus=success&username=$username&auth-msg=Profile+cancelled"
+            ];
+        }
+
+        $payload = [
+            'publisher-name'     => PNP_PUBLISHER_NAME,
+            'publisher-password' => PNP_API_KEY,
+            'mode'               => 'cancel_member',
+            'username'           => $username,
+        ];
+
+        return self::executeHttpCall(PNP_AUTHPREV_URL, $payload);
+    }
+
+    /**
      * Helper to execute HTTP POST requests via cURL
      */
     private static function executeHttpCall(string $url, array $payload): array {

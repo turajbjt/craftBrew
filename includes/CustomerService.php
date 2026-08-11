@@ -280,18 +280,25 @@ class CustomerService {
     }
 
     /**
-     * Disable Recurring Billing for Customer
+     * Disable Recurring Billing for Customer & Cancel Member Profile at Gateway
      */
     public static function disableRecurring(string $saasId, string $actorUsername = 'SYSTEM'): bool {
         $pdo = Database::getConnection();
+        $profile = self::getCustomerBySaasId($saasId);
+
         $stmt = $pdo->prepare("UPDATE customer_profiles SET billcycle = 0, status = 'cancelled' WHERE saas_id = ?");
         $success = $stmt->execute([$saasId]);
 
         if ($success) {
+            if ($profile && !empty($profile['username'])) {
+                require_once __DIR__ . '/PnpApiService.php';
+                PnpApiService::cancelMember($profile['username']);
+            }
+
             $gmtNow = get_gmt_now_formatted();
             $stmtSvc = $pdo->prepare("
                 INSERT INTO service_history (saas_id, datetime, action, reason, actor_username)
-                VALUES (?, ?, 'recurring_disabled', 'Recurring billing disabled (billcycle set to 0, status set to cancelled)', ?)
+                VALUES (?, ?, 'recurring_disabled', 'Recurring billing disabled (billcycle set to 0, status set to cancelled, cancel_member called)', ?)
             ");
             $stmtSvc->execute([$saasId, $gmtNow, $actorUsername]);
         }
