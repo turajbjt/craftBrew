@@ -1,0 +1,8 @@
+# Database files
+data/*.sqlite
+data/*.db
+*.sqlite
+*.db
+
+# Environment override
+.env

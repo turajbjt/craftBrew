@@ -83,7 +83,10 @@ recurringMgt/
 
 ## Database Schema & Seed Data
 
-Import `schema.sql` into your MySQL server:
+The system uses **SQLite by default** zero-configuration storage (`data/recurring_mgt.sqlite`), which automatically initializes the database tables and seed data upon first access.
+
+### MySQL Engine Option:
+To use MySQL instead of SQLite, set `DB_ENGINE=mysql` in your environment or `config.php` and import `schema.sql`:
 
 ```bash
 mysql -u root -p < schema.sql

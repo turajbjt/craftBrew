@@ -6,7 +6,10 @@
 // Timezone setup - system operates on GMT/UTC as specified
 date_default_timezone_set('UTC');
 
-// Database Configuration
+// Database Configuration (Supported engines: 'sqlite', 'mysql')
+define('DB_ENGINE', getenv('DB_ENGINE') ?: 'sqlite');
+define('DB_SQLITE_PATH', getenv('DB_SQLITE_PATH') ?: __DIR__ . '/data/recurring_mgt.sqlite');
+
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
 define('DB_NAME', getenv('DB_NAME') ?: 'recurring_mgt');

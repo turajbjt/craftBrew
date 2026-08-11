@@ -5,6 +5,9 @@
 
 date_default_timezone_set('UTC');
 
+define('DB_ENGINE', 'sqlite'); // 'sqlite' or 'mysql'
+define('DB_SQLITE_PATH', __DIR__ . '/data/recurring_mgt.sqlite');
+
 define('DB_HOST', '127.0.0.1');
 define('DB_PORT', '3306');
 define('DB_NAME', 'recurring_mgt');
