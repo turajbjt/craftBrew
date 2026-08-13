@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAuditor) {
                     trim($_POST['card_name']),
                     trim($_POST['email']),
                     trim($_POST['phone']),
-                    trim($_POST['enddate']),
+                    CustomerService::parseToYyyymmdd(trim($_POST['enddate'])),
                     (int)$_POST['billcycle'],
                     trim($_POST['billcycle_type']),
                     trim($_POST['status']),
@@ -125,37 +125,6 @@ $customers = $stmt->fetchAll();
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-    }
-</style>
-
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-    <div>
-        <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Customer Profiles</h1>
-        <p style="color: var(--text-muted); margin: 4px 0 0 0;">Lookup, edit, run manual COF charges, or manage subscription cycles.</p>
-    </div>
-    <?php if (!$isAuditor): ?>
-        <form method="POST" style="margin: 0;" onsubmit="return confirm('Trigger Remote API list_members sync to update all customer records from Plug\'n Pay gateway?');">
-            <input type="hidden" name="action" value="resync_gateway">
-            <button type="submit" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: none; font-weight: 600; cursor: pointer; padding: 10px 18px; border-radius: 8px;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Resync Gateway Profiles
-            </button>
-        </form>
-    <?php endif; ?>
-</div>
-        display: flex;
-        gap: 12px;
-        margin-bottom: 25px;
-    }
-    .search-input {
-        flex: 1;
-        padding: 12px 18px;
-        background: var(--panel-bg);
-        border: 1px solid var(--panel-border);
-        border-radius: 12px;
-        color: white;
-        font-size: 0.95rem;
-        outline: none;
     }
     .btn {
         padding: 10px 18px;
@@ -240,9 +209,9 @@ $customers = $stmt->fetchAll();
     }
 </style>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 16px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
     <div>
-        <h1 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700; margin: 0;">Customer Profiles</h1>
+        <h1 style="margin: 0; font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Customer Profiles</h1>
         <p style="color: var(--text-muted); margin: 4px 0 0 0;">Lookup, edit, run manual COF charges, or manage subscription cycles.</p>
     </div>
     <?php if (!$isAuditor): ?>
@@ -300,6 +269,9 @@ $customers = $stmt->fetchAll();
                         <td>
                             <div style="font-weight: 600; color: #a5b4fc; font-family: monospace;"><?= htmlspecialchars($c['saas_id']) ?></div>
                             <div style="font-size: 0.95rem; font-weight: 500; margin-top: 2px;"><?= htmlspecialchars($c['card_name']) ?></div>
+                            <?php if (!empty($c['username'])): ?>
+                                <div style="font-size: 0.8rem; color: #60a5fa; margin-top: 2px;">👤 Username: <strong style="color: #93c5fd;"><?= htmlspecialchars($c['username']) ?></strong></div>
+                            <?php endif; ?>
                             <div style="font-size: 0.8rem; color: var(--text-muted);"><?= htmlspecialchars($c['email']) ?></div>
                         </td>
                         <td>
@@ -311,8 +283,8 @@ $customers = $stmt->fetchAll();
                             <div style="font-size: 0.8rem; color: var(--text-muted);">Cycle: <?= (int)$c['billcycle'] ?> <?= $c['billcycle_type'] === 'd' ? 'day(s)' : 'month(s)' ?></div>
                         </td>
                         <td>
-                            <div style="font-weight: 500;"><?= htmlspecialchars($c['enddate']) ?></div>
-                            <div style="font-size: 0.78rem; color: var(--text-muted);">Last Attempt: <?= htmlspecialchars($c['last_attempt'] ?? 'None') ?></div>
+                            <div style="font-weight: 500;"><?= htmlspecialchars(CustomerService::formatDisplayDate($c['enddate'])) ?></div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted);">Last Attempt: <?= htmlspecialchars(!empty($c['last_attempt']) ? CustomerService::formatDisplayDate($c['last_attempt']) : 'None') ?></div>
                         </td>
                         <td>
                             <span class="status-badge status-<?= htmlspecialchars($c['status']) ?>"><?= htmlspecialchars($c['status']) ?></span>
@@ -366,7 +338,11 @@ $customers = $stmt->fetchAll();
             <input type="hidden" name="action" value="edit_profile">
             <input type="hidden" name="saas_id" id="edit_saas_id">
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="font-size:0.8rem; color:var(--text-muted);">Customer Username</label>
+                    <input type="text" id="edit_username" readonly disabled style="width:100%; padding:10px; background:#0f172a; border:1px solid var(--panel-border); border-radius:8px; color:#94a3b8; font-weight:600;">
+                </div>
                 <div>
                     <label style="font-size:0.8rem; color:var(--text-muted);">Card Name</label>
                     <input type="text" name="card_name" id="edit_card_name" required style="width:100%; padding:10px; background:#0f172a; border:1px solid var(--panel-border); border-radius:8px; color:white;">
@@ -383,7 +359,7 @@ $customers = $stmt->fetchAll();
                     <input type="text" name="phone" id="edit_phone" style="width:100%; padding:10px; background:#0f172a; border:1px solid var(--panel-border); border-radius:8px; color:white;">
                 </div>
                 <div>
-                    <label style="font-size:0.8rem; color:var(--text-muted);">Next EndDate (YYYYMMDD)</label>
+                    <label style="font-size:0.8rem; color:var(--text-muted);">Next EndDate (MM/DD/YYYY)</label>
                     <input type="text" name="enddate" id="edit_enddate" required style="width:100%; padding:10px; background:#0f172a; border:1px solid var(--panel-border); border-radius:8px; color:white;">
                 </div>
             </div>
@@ -430,12 +406,25 @@ $customers = $stmt->fetchAll();
 </div>
 
 <script>
+function formatDateForInput(dateStr) {
+    if (!dateStr) return '';
+    var clean = dateStr.replace(/\D/g, '');
+    if (clean.length === 8) {
+        var year = clean.substring(0, 4);
+        var month = clean.substring(4, 6);
+        var day = clean.substring(6, 8);
+        return month + '/' + day + '/' + year;
+    }
+    return dateStr;
+}
+
 function openEditModal(customer) {
     document.getElementById('edit_saas_id').value = customer.saas_id;
+    document.getElementById('edit_username').value = customer.username || '(None)';
     document.getElementById('edit_card_name').value = customer.card_name;
     document.getElementById('edit_email').value = customer.email;
     document.getElementById('edit_phone').value = customer.phone || '';
-    document.getElementById('edit_enddate').value = customer.enddate;
+    document.getElementById('edit_enddate').value = formatDateForInput(customer.enddate);
     document.getElementById('edit_billcycle').value = customer.billcycle;
     document.getElementById('edit_billcycle_type').value = customer.billcycle_type;
     document.getElementById('edit_status').value = customer.status;

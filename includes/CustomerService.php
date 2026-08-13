@@ -20,6 +20,46 @@ class CustomerService {
     }
 
     /**
+     * Format YYYYMMDD string into MM/DD/YYYY for user display
+     */
+    public static function formatDisplayDate(?string $dateStr): string {
+        if (empty($dateStr)) return '';
+        $clean = preg_replace('/[^\d]/', '', $dateStr);
+        if (strlen($clean) === 8) {
+            $year  = substr($clean, 0, 4);
+            $month = substr($clean, 4, 2);
+            $day   = substr($clean, 6, 2);
+            if ((int)$year >= 1900 && (int)$year <= 2100) {
+                return "{$month}/{$day}/{$year}";
+            }
+        }
+        $ts = strtotime($dateStr);
+        return $ts ? date('m/d/Y', $ts) : $dateStr;
+    }
+
+    /**
+     * Convert user input (MM/DD/YYYY, YYYY-MM-DD, or YYYYMMDD) into YYYYMMDD for DB & API storage
+     */
+    public static function parseToYyyymmdd(?string $dateStr): string {
+        if (empty($dateStr)) return date('Ymd');
+        $clean = preg_replace('/[^\d]/', '', $dateStr);
+
+        if (strlen($clean) === 8) {
+            $first4 = (int)substr($clean, 0, 4);
+            if ($first4 >= 1900 && $first4 <= 2100) {
+                return $clean; // Already YYYYMMDD
+            }
+            $month = substr($clean, 0, 2);
+            $day   = substr($clean, 2, 2);
+            $year  = substr($clean, 4, 4);
+            return "{$year}{$month}{$day}";
+        }
+
+        $ts = strtotime($dateStr);
+        return $ts ? date('Ymd', $ts) : date('Ymd');
+    }
+
+    /**
      * Calculate new enddate given current YYYYMMDD, increment count, and type ('d' or 'm')
      */
     public static function calculateNextEndDate(string $currentEndDate, int $billcycle, string $billcycleType): string {
@@ -386,12 +426,27 @@ class CustomerService {
 
         foreach ($res['records'] as $record) {
             $username = trim($record['username'] ?? '');
-            if (empty($username)) continue;
+            $orderId  = trim($record['orderid'] ?? $record['orderID'] ?? '');
+            $email    = trim($record['email'] ?? '');
 
-            // Find customer by username
-            $stmt = $pdo->prepare("SELECT * FROM customer_profiles WHERE username = ?");
-            $stmt->execute([$username]);
-            $customer = $stmt->fetch();
+            $customer = null;
+
+            // Match customer by username, order ID, or email
+            if (!empty($username)) {
+                $stmt = $pdo->prepare("SELECT * FROM customer_profiles WHERE username = ?");
+                $stmt->execute([$username]);
+                $customer = $stmt->fetch();
+            }
+            if (!$customer && !empty($orderId)) {
+                $stmt = $pdo->prepare("SELECT * FROM customer_profiles WHERE orderid = ?");
+                $stmt->execute([$orderId]);
+                $customer = $stmt->fetch();
+            }
+            if (!$customer && !empty($email)) {
+                $stmt = $pdo->prepare("SELECT * FROM customer_profiles WHERE email = ?");
+                $stmt->execute([$email]);
+                $customer = $stmt->fetch();
+            }
 
             if ($customer) {
                 $updates = [];
@@ -429,6 +484,54 @@ class CustomerService {
 
                     $updatedCount++;
                 }
+            } else {
+                // Auto-import gateway profile if not present in local database
+                $saasId = self::generateSaasId();
+                $recOrderId = !empty($orderId) ? $orderId : ('PNP-' . date('YmdHis') . '-' . rand(1000, 9999));
+                $recUsername = !empty($username) ? $username : ('user_' . substr(md5($recOrderId), 0, 8));
+                $recEmail = !empty($email) ? $email : ($recUsername . '@gateway.import');
+                $cardName = trim($record['card_name'] ?? $record['name'] ?? $recUsername);
+                $phone = trim($record['phone'] ?? '');
+                $startDate = !empty($record['startdate']) ? $record['startdate'] : date('Ymd');
+                $endDate = (!empty($record['enddate']) && strlen($record['enddate']) === 8) ? $record['enddate'] : date('Ymd', strtotime('+30 days'));
+                $billcycle = isset($record['billcycle']) ? (int)$record['billcycle'] : 1;
+                $billcycleType = !empty($record['billcycle_type']) ? strtolower($record['billcycle_type']) : 'm';
+                $recurringFee = isset($record['recurringfee']) ? (float)$record['recurringfee'] : (isset($record['fee']) ? (float)$record['fee'] : 0.00);
+                $statusVal = !empty($record['status']) ? strtolower($record['status']) : 'active';
+                $status = in_array($statusVal, ['active', 'pending', 'cancelled'], true) ? $statusVal : 'active';
+                $acctCode = trim($record['acct_code'] ?? $record['acct-code'] ?? '');
+                $acctCode2 = trim($record['acct_code2'] ?? $record['acct-code2'] ?? '');
+                $cardNumber = trim($record['card_number'] ?? $record['card-number'] ?? 'XXXX-XXXX-XXXX-XXXX');
+                $cardExp = trim($record['card_exp'] ?? $record['card-exp'] ?? '12/99');
+
+                $stmtIns = $pdo->prepare("
+                    INSERT INTO customer_profiles (
+                        saas_id, orderid, username, card_name, phone, email,
+                        accttype, card_number, card_exp, startdate, enddate,
+                        billcycle, billcycle_type, currency, recurringfee, status,
+                        acct_code, acct_code2, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?,
+                        'credit', ?, ?, ?, ?,
+                        ?, ?, 'USD', ?, ?,
+                        ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    )
+                ");
+                $stmtIns->execute([
+                    $saasId, $recOrderId, $recUsername, $cardName, $phone, $recEmail,
+                    $cardNumber, $cardExp, $startDate, $endDate,
+                    $billcycle, $billcycleType, $recurringFee, $status,
+                    $acctCode, $acctCode2
+                ]);
+
+                // Service history log
+                $stmtSvc = $pdo->prepare("
+                    INSERT INTO service_history (saas_id, datetime, action, reason, actor_username)
+                    VALUES (?, ?, 'gateway_import', 'Customer profile imported from Plug-n-Pay gateway list_members API', ?)
+                ");
+                $stmtSvc->execute([$saasId, $gmtNow, $actorUsername]);
+
+                $updatedCount++;
             }
         }
 

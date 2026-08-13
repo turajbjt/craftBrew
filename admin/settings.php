@@ -15,13 +15,14 @@ $errorMsg = null;
 
 // Handle Settings Update
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $remoteApiUrl = trim($_POST['pnp_authprev_url'] ?? '');
     $updatedSettings = [
         'pnp_publisher_name'       => trim($_POST['pnp_publisher_name'] ?? ''),
         'pnp_api_key'              => trim($_POST['pnp_api_key'] ?? ''),
         'pnp_mock_mode'            => ($_POST['pnp_mock_mode'] ?? 'true') === 'true' ? 'true' : 'false',
-        'pnp_authprev_url'         => trim($_POST['pnp_authprev_url'] ?? ''),
-        'pnp_batch_upload_url'     => trim($_POST['pnp_batch_upload_url'] ?? ''),
-        'pnp_query_trans_url'      => trim($_POST['pnp_query_trans_url'] ?? ''),
+        'pnp_authprev_url'         => $remoteApiUrl,
+        'pnp_batch_upload_url'     => $remoteApiUrl,
+        'pnp_query_trans_url'      => $remoteApiUrl,
         'pnp_smart_screens_url'    => trim($_POST['pnp_smart_screens_url'] ?? ''),
         'alert_email_from'         => trim($_POST['alert_email_from'] ?? ''),
         'alert_email_to'           => trim($_POST['alert_email_to'] ?? ''),
@@ -253,27 +254,17 @@ $currentSettings = SettingsService::getAll();
             </div>
 
             <div class="form-group">
-                <label>Authprev Remote API URL</label>
+                <label>Remote API URL</label>
                 <input type="url" name="pnp_authprev_url" class="form-control" required
                        value="<?= htmlspecialchars($currentSettings['pnp_authprev_url'] ?? PNP_AUTHPREV_URL) ?>">
+                <div class="help-text">Main Remote API endpoint for authprev, batch upload, membership, and query_trans.</div>
             </div>
 
             <div class="form-group">
-                <label>Batch Upload API URL</label>
-                <input type="url" name="pnp_batch_upload_url" class="form-control" required
-                       value="<?= htmlspecialchars($currentSettings['pnp_batch_upload_url'] ?? PNP_BATCH_UPLOAD_URL) ?>">
-            </div>
-
-            <div class="form-group">
-                <label>Query Trans API URL</label>
-                <input type="url" name="pnp_query_trans_url" class="form-control" required
-                       value="<?= htmlspecialchars($currentSettings['pnp_query_trans_url'] ?? PNP_QUERY_TRANS_URL) ?>">
-            </div>
-
-            <div class="form-group">
-                <label>Smart Screens v2 Base URL</label>
+                <label>Smart Screens v2 URL</label>
                 <input type="url" name="pnp_smart_screens_url" class="form-control" required
                        value="<?= htmlspecialchars($currentSettings['pnp_smart_screens_url'] ?? PNP_SMART_SCREENS_URL) ?>">
+                <div class="help-text">Hosted iframe order collection endpoint.</div>
             </div>
         </div>
 

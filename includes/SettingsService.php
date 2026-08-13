@@ -64,6 +64,7 @@ class SettingsService {
             }
             return $success;
         } catch (Throwable $e) {
+            error_log("SettingsService::set error: " . $e->getMessage());
             return false;
         }
     }

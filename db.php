@@ -44,9 +44,10 @@ class Database {
                     self::$instance = new PDO($dsn, null, null, $options);
                     self::$instance->exec("PRAGMA foreign_keys = ON;");
 
-                    // Auto-initialize SQLite schema if tables do not exist yet
-                    $checkTable = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")->fetch();
-                    if (!$checkTable || $isNewDatabase) {
+                    // Auto-initialize SQLite schema if any core tables do not exist yet
+                    $checkSettingsTable = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")->fetch();
+                    $checkUsersTable    = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")->fetch();
+                    if (!$checkSettingsTable || !$checkUsersTable || $isNewDatabase) {
                         self::initSqliteDatabase(self::$instance);
                     }
                 } else {
