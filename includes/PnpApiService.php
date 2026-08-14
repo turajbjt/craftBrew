@@ -8,9 +8,9 @@ require_once __DIR__ . '/../config.php';
 class PnpApiService {
 
     /**
-     * Generate Smart Screens v2 hosted payment URL or parameters
+     * Generate Smart Screens v2 associative array of POST fields
      */
-    public static function getSmartScreensIframeUrl(array $planDetails, string $customOrderId = '', array $customerData = []): string {
+    public static function getSmartScreensPostFields(array $planDetails, string $customOrderId = '', array $customerData = []): array {
         if (empty($customOrderId)) {
             $customOrderId = 'SS-' . date('YmdHis') . '-' . rand(1000, 9999);
         }
@@ -18,7 +18,12 @@ class PnpApiService {
         $initialAmount = number_format((float)($planDetails['initial_amount'] ?? 0), 2, '.', '');
         $recurringAmount = number_format((float)($planDetails['recurringfee'] ?? 0), 2, '.', '');
 
-        $params = [
+        $username = trim($customerData['username'] ?? '');
+        if ($username === '') {
+            $username = $customOrderId;
+        }
+
+        return [
             'pt_gateway_account'                => PNP_PUBLISHER_NAME,
             'pt_order_classifier'               => $customOrderId,
             'pr_plan_id'                        => $planDetails['planid'] ?? '',
@@ -32,14 +37,20 @@ class PnpApiService {
             'pd_collect_credentials'            => 'yes',
             'pd_display_items'                  => 'yes',
             'pb_cards_allowed'                  => 'visa,mastercard,amex,discover',
-            'pt_customer_username'              => $customerData['username'] ?? '',
+            'pt_customer_username'              => $username,
             'pb_customer_password'              => $customerData['password'] ?? '',
             'pb_customer_password_confirmation' => $customerData['password'] ?? '',
             'pt_account_code_1'                 => $planDetails['purchaseid'] ?? '',
-            'callback_url'                      => APP_URL . '/callback.php',
-            'return_url'                        => APP_URL . '/callback.php?status=success',
+            'pb_success_url'                    => APP_URL . '/callback.php',
+            'pb_transition_type'                => 'get',
         ];
+    }
 
+    /**
+     * Generate Smart Screens v2 hosted payment URL or parameters
+     */
+    public static function getSmartScreensIframeUrl(array $planDetails, string $customOrderId = '', array $customerData = []): string {
+        $params = self::getSmartScreensPostFields($planDetails, $customOrderId, $customerData);
         return PNP_SMART_SCREENS_URL . '?' . http_build_query($params);
     }
 
