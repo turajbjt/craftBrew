@@ -2,18 +2,16 @@ version: '3.8'
 
 services:
   web:
-    build: .
-    container_name: recurring_web
+    image: recurringmgt-web:latest
+    container_name: craftbrew_web
     ports:
       - "8080:80"
     environment:
-      - DB_ENGINE=sqlite
       - DB_HOST=db
       - DB_PORT=3306
-      - DB_NAME=recurring_mgt
-      - DB_USER=recurring_user
-      - DB_PASS=secretpassword
-      - PNP_MOCK_MODE=true
+      - DB_NAME=craftbrew
+      - DB_USER=brewuser
+      - DB_PASS=brewpassword
       - APP_URL=http://localhost:8080
     volumes:
       - .:/var/www/html
@@ -21,13 +19,13 @@ services:
       - db
 
   db:
-    image: mysql:8.0
-    container_name: recurring_db
+    image: mariadb:10.11
+    container_name: craftbrew_db
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: recurring_mgt
-      MYSQL_USER: recurring_user
-      MYSQL_PASSWORD: secretpassword
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: craftbrew
+      MARIADB_USER: brewuser
+      MARIADB_PASSWORD: brewpassword
     ports:
       - "3306:3306"
     volumes:

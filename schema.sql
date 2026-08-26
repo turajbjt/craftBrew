@@ -1,138 +1,156 @@
--- Database Creation Schema for Recurring Management System
-CREATE DATABASE IF NOT EXISTS recurring_mgt CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE recurring_mgt;
+-- MariaDB / MySQL Schema for Home & Craft Brewing System
+-- Supports Multi-user Auth, Recipes, Structured Ingredients, Supplies, Steps, Batches, Readings, and Documents
 
--- Table: payment_plans
-CREATE TABLE IF NOT EXISTS payment_plans (
-    planid VARCHAR(50) PRIMARY KEY,
-    description TEXT NOT NULL,
-    collect_unpw CHAR(1) NOT NULL DEFAULT 'N',
-    currency CHAR(3) NOT NULL DEFAULT 'USD',
-    initial_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    initial_months INT NOT NULL DEFAULT 0,
-    initial_days INT NOT NULL DEFAULT 0,
-    recurringfee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    balance DECIMAL(10,2) NULL,
-    billcycle INT NOT NULL DEFAULT 1,
-    billcycle_type CHAR(1) NOT NULL DEFAULT 'm',
-    purchaseid VARCHAR(100) NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Table: customer_profiles
-CREATE TABLE IF NOT EXISTS customer_profiles (
-    saas_id VARCHAR(36) PRIMARY KEY,
-    orderid VARCHAR(64) UNIQUE NOT NULL,
-    username VARCHAR(100) NULL,
-    password VARCHAR(255) NULL,
-    card_name VARCHAR(150) NOT NULL,
-    phone VARCHAR(30) NULL,
-    email VARCHAR(150) NOT NULL,
-    accttype ENUM('checking', 'savings', 'credit') NOT NULL DEFAULT 'credit',
-    card_number VARCHAR(30) NOT NULL, -- Masked e.g. XXXX-XXXX-XXXX-1234
-    card_exp VARCHAR(10) NOT NULL,    -- MMYY
-    routingnum VARCHAR(30) NULL,      -- Masked
-    accountnum VARCHAR(30) NULL,      -- Masked
-    startdate CHAR(8) NOT NULL,       -- YYYYMMDD
-    enddate CHAR(8) NOT NULL,         -- YYYYMMDD
-    last_attempt CHAR(14) NULL,       -- YYYYMMDDhhmmss GMT
-    last_billed CHAR(14) NULL,        -- YYYYMMDDhhmmss GMT
-    billcycle INT NOT NULL DEFAULT 0,
-    billcycle_type CHAR(1) NOT NULL DEFAULT 'm', -- 'd' = days, 'm' = months
-    currency CHAR(3) NOT NULL DEFAULT 'USD',
-    recurringfee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    balance DECIMAL(10,2) NULL,
-    status ENUM('active', 'pending', 'cancelled') NOT NULL DEFAULT 'active',
-    planid VARCHAR(50) NULL,
-    acct_code VARCHAR(100) NULL,
-    acct_code2 VARCHAR(100) NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (planid) REFERENCES payment_plans(planid) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Table: service_history
-CREATE TABLE IF NOT EXISTS service_history (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    saas_id VARCHAR(36) NOT NULL,
-    datetime CHAR(14) NOT NULL,       -- YYYYMMDDhhmmss GMT
-    action VARCHAR(100) NOT NULL,
-    reason TEXT NULL,
-    ipaddress VARCHAR(45) NULL,
-    actor_username VARCHAR(100) NULL,
-    INDEX idx_service_saas (saas_id),
-    FOREIGN KEY (saas_id) REFERENCES customer_profiles(saas_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Table: billing_history
-CREATE TABLE IF NOT EXISTS billing_history (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    saas_id VARCHAR(36) NOT NULL,
-    datetime CHAR(14) NOT NULL,       -- YYYYMMDDhhmmss GMT
-    orderID VARCHAR(64) NOT NULL,
-    description TEXT NULL,
-    result VARCHAR(50) NOT NULL,       -- success, hard_fail, soft_fail, pending
-    amount DECIMAL(10,2) NOT NULL,
-    INDEX idx_billing_saas (saas_id),
-    INDEX idx_billing_order (orderID),
-    FOREIGN KEY (saas_id) REFERENCES customer_profiles(saas_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Table: users (Sub-logins & Admin Roles)
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    role ENUM('owner', 'manager', 'auditor', 'worker') NOT NULL DEFAULT 'worker',
-    status ENUM('active', 'disabled') NOT NULL DEFAULT 'active',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    role VARCHAR(20) NOT NULL DEFAULT 'brewer',
+    api_token VARCHAR(64) UNIQUE NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Table: audit_logs
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL,
-    action VARCHAR(100) NOT NULL,
-    details TEXT NULL,
-    ipaddress VARCHAR(45) NULL,
-    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_audit_user (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    description TEXT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed Sample Payment Plans
-INSERT INTO payment_plans (planid, description, collect_unpw, currency, initial_amount, initial_months, initial_days, recurringfee, balance, billcycle, billcycle_type, purchaseid)
-VALUES 
-('PLAN-BASIC-M', 'Basic Monthly Plan', 'N', 'USD', 29.99, 1, 0, 29.99, NULL, 1, 'm', 'GROUP-BASIC'),
-('PLAN-PRO-M', 'Pro Monthly Subscription', 'Y', 'USD', 79.99, 1, 0, 79.99, NULL, 1, 'm', 'GROUP-PRO'),
-('PLAN-ANNUAL', 'Annual Premium Membership', 'Y', 'USD', 499.00, 12, 0, 499.00, NULL, 12, 'm', 'GROUP-ANNUAL'),
-('PLAN-WEEKLY', 'Weekly Special Pass', 'N', 'USD', 9.99, 0, 7, 9.99, NULL, 7, 'd', 'GROUP-PASS')
+-- Seed default categories
+INSERT INTO categories (name, description) VALUES
+('Beer', 'Malt and hop based fermented beverages'),
+('Wine', 'Grape and fruit based wines'),
+('Cider', 'Apple and fruit cider brews'),
+('Mead', 'Honey based fermented drinks'),
+('Fruit Wine', 'Specialty fruit & berry wines')
 ON DUPLICATE KEY UPDATE description=VALUES(description);
 
--- Seed Initial Owner User (Username: admin, Password: adminPassword123!)
-INSERT INTO users (username, password_hash, email, role, status)
-VALUES ('admin', '$2y$10$abcdefghijklmnopqrstuuV1FlKZj8phOjK35nHX/CZYJVSeP9mmW', 'owner@example.com', 'owner', 'active')
-ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), email=VALUES(email);
+CREATE TABLE IF NOT EXISTS recipes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    category_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    style VARCHAR(100) DEFAULT '',
+    batch_size_gal DECIMAL(6,2) DEFAULT 5.00,
+    target_og DECIMAL(4,3) DEFAULT NULL,
+    target_fg DECIMAL(4,3) DEFAULT NULL,
+    target_abv DECIMAL(4,2) DEFAULT NULL,
+    ingredients TEXT,
+    instructions TEXT,
+    is_public TINYINT(1) DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Table: system_settings
-CREATE TABLE IF NOT EXISTS system_settings (
-    setting_key VARCHAR(100) PRIMARY KEY,
-    setting_value TEXT NULL,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Structured Recipe Ingredients Table
+CREATE TABLE IF NOT EXISTS recipe_ingredients (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipe_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    ingredient_type VARCHAR(50) NOT NULL DEFAULT 'Fermentable',
+    amount DECIMAL(8,2) DEFAULT 0.00,
+    unit VARCHAR(20) DEFAULT '',
+    stage_addition VARCHAR(50) DEFAULT 'Primary',
+    notes TEXT,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Seed System Settings
-INSERT INTO system_settings (setting_key, setting_value) VALUES
-('pnp_publisher_name', 'demo_publisher'),
-('pnp_api_key', 'demo_api_key_12345'),
-('pnp_mock_mode', 'true'),
-('pnp_authprev_url', 'https://pay1.plugnpay.com/payment/pnpremote.cgi'),
-('pnp_batch_upload_url', 'https://pay1.plugnpay.com/payment/pnpremote.cgi'),
-('pnp_query_trans_url', 'https://pay1.plugnpay.com/payment/pnpremote.cgi'),
-('pnp_smart_screens_url', 'https://pay1.plugnpay.com/pay/'),
-('alert_email_from', 'billing-alerts@example.com'),
-('alert_email_to', 'merchant-admin@example.com'),
-('send_email_notifications', 'true'),
-('app_name', 'SaaS Recurring Billing & Management Portal'),
-('app_url', 'http://localhost:8080')
-ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
+-- Structured Recipe Supplies & Equipment Table
+CREATE TABLE IF NOT EXISTS recipe_supplies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipe_id INT NOT NULL,
+    item_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) DEFAULT 'Equipment',
+    quantity VARCHAR(50) DEFAULT '1 unit',
+    is_required TINYINT(1) DEFAULT 1,
+    notes TEXT,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Structured Recipe Process Steps Table
+CREATE TABLE IF NOT EXISTS recipe_steps (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipe_id INT NOT NULL,
+    step_number INT NOT NULL,
+    phase VARCHAR(50) NOT NULL DEFAULT 'Brew Day',
+    title VARCHAR(150) NOT NULL,
+    duration VARCHAR(50) DEFAULT '',
+    target_temp VARCHAR(30) DEFAULT '',
+    instructions TEXT,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS batches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    recipe_id INT NULL,
+    category_id INT NOT NULL,
+    batch_code VARCHAR(50) DEFAULT '',
+    batch_name VARCHAR(100) NOT NULL,
+    batch_type VARCHAR(50) DEFAULT '',
+    batch_style VARCHAR(100) DEFAULT '',
+    batch_size_gal DECIMAL(6,2) DEFAULT 5.00,
+    date_start DATE NULL,
+    date_rack DATE NULL,
+    date_rack_2 DATE NULL,
+    date_rack_3 DATE NULL,
+    date_bottle DATE NULL,
+    pitch_temp_f VARCHAR(10) DEFAULT '',
+    ferment_temp_f VARCHAR(10) DEFAULT '',
+    gravity_og DECIMAL(4,3) DEFAULT NULL,
+    gravity_sg DECIMAL(4,3) DEFAULT NULL,
+    gravity_tertiary DECIMAL(4,3) DEFAULT NULL,
+    gravity_fg DECIMAL(4,3) DEFAULT NULL,
+    calculated_abv DECIMAL(4,2) DEFAULT NULL,
+    ingredients TEXT,
+    boil_notes TEXT,
+    tasting_notes TEXT,
+    reflections TEXT,
+    rating TINYINT UNSIGNED DEFAULT 0,
+    status VARCHAR(30) NOT NULL DEFAULT 'Primary',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id),
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fermentation_readings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    batch_id INT NOT NULL,
+    reading_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    gravity DECIMAL(4,3) NOT NULL,
+    temp_f VARCHAR(10) DEFAULT '',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    category VARCHAR(50) DEFAULT 'General',
+    filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(50) NOT NULL,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Inventory & Stock Management Table
+CREATE TABLE IF NOT EXISTS inventory (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    item_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'Fermentable',
+    quantity DECIMAL(8,2) DEFAULT 0.00,
+    unit VARCHAR(20) DEFAULT '',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

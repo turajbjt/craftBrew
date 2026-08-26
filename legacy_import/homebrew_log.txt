@@ -1,0 +1,312 @@
+Date: 09/04/06
+Kit: BeerMan
+Type: IPA
+Size: 5.0 Gal
+
+Ingredents:
+- 2 cans of pre-hopped liquid malt
+- 1 packet Nottingham dry yeast
+- 5 gals of Walbounds spring water
+
+Origial Gravity: ?
+ABV: ?
+Pitch Temp: 74 F
+
+Fermet Temp: 74 F
+
+Rack Date: 09/11/06
+Final Gravity: 1.012
+
+Comments:
+- used Muntons CarbTabs for bottle carbination (6 tablets per 16oz bottle)
+
+Rating: 8 of 10
+
+-----------------------------------------
+Date: 10/09/06
+Kit: None
+Type: Hard Cider
+Size: 5.25 Gal
+
+Ingredents:
+- 5 gals Pathmark Cider (Darker Type)
+- 1 can Pathmark frozen apple juice concentrate
+- 2 lbs table suger
+- 1 packet Muntons Gold dry yeast
+
+Original Gravity: ?
+ABV: ?
+Pitch Temp: 72 F
+
+Ferment Temp: 78 F
+
+Rack Date: 10/18/06
+Final Gravity: 1.030
+
+Comments:
+- did not use any Potasioum Sorbate to stop fermentation
+- did not use any extra suger or CarbTabs to carbinate bottles
+- bottled too early, which caused bottles to get over carbinated
+
+Rating: 6 of 10
+
+-----------------------------------------
+Date: 12/03/06
+Kit: Beer Man
+Type: Export Stout
+Size: 5.0 Gal
+
+Ingredents:
+- 2 cans of pre-hopped liquid malt
+- 1 packet Nottingham dry yeast
+- 5 gals of Walbounds spring water
+
+Origial Gravity: 1.048
+ABV: ~6.5%
+Pitch Temp: 82 F
+
+Fermet Temp: 70 F
+
+Rack Date: 12/11/06
+Final Gravity: 1.010
+
+Comments:
+- used Muntons CarbTabs for bottle carbination (6 tablets per 16oz bottle)
+
+Rating: 9 of 10
+
+-----------------------------------------
+Date: 01/09/07
+Kit: None
+Type: Hard Cider
+Size: 5.5 Gal
+
+Ingredents:
+- 5 gals Pathmark Cider (Ligher Type)
+- 1 can Pathmark frozen apple juice concentrate
+- 3.5 lbs table suger
+- 1 packet Muntons Gold dry yeast
+
+Original Gravity: 1.064
+ABV: ~9%
+Pitch Temp: 72 F
+
+Ferment Temp: 68 F
+
+Rack Date: 02/08/07
+Final Gravity: 1.005
+
+Comments:
+- boiled suger in 8 cups spring water for 10 minutes, before adding it to fermenter
+- used Potasium Sorbate to stop fermentation
+- did not use any suger or CarbTabs to carbinate bottles.
+- tastes strong; think its closer to an apple wine, then a hard cider.
+
+Rating: 7.5 of 10
+
+-----------------------------------------
+Date: 02/08/07
+Kit: None
+Type: Simple Blush/Fruit Wine
+Size: 4.0 Gal
+
+Ingredents:
+- 1 gal Pathmark Cider (Ligher Type)
+- 1 gal Walbounds Apple/Cranberry Fruit Juice
+- 1 gal Welchers White Grape Fruit Juice
+- .5 gal Walbounds White Peach/White Grape Fruit Juice
+- .5 gal Walbounds Cherry Fruit Juice Cocktail
+- 3.5 lbs table suger
+- 1 packet Muntons dry yeast
+
+Original Gravity: ?
+ABV: ?
+Pitch Temp: 74 F
+
+Ferment Temp: 68 F
+
+Rack Date: 03/08/07
+Final Gravity: 1.008
+
+Comments:
+- should have boiled suger, before adding it [my bad...]
+- just threw this together with what I had on hand, so have no clue how it will turn out
+- others think it's more a light/fruity wine cooler, then a fruit wine
+- makes a nice refreshing hot summer drink
+- low on alcohol (maybe 4% max)
+- consider using a wine yeast next, instead of beer yeast
+
+Rating: 7 of 10
+
+-----------------------------------------
+Date: 04/05/07
+Kit: Brewer's Best
+Type: Red Ale
+Size: 5.0 Gal
+
+Ingredents:
+- 1 cans of pre-hopped liquid malt
+- 1 packet Nottingham dry yeast
+- other assorted grains & hops
+
+Original Gravity: 1.042
+ABV: ~5.5
+Pitch Temp: 80 F
+
+Ferment Temp: 72 F
+
+Rack Date: 04/15/07
+Final Gravity: 1.011
+
+Comments:
+- this was my first partial boil kit, so it took several hours to complete
+- followed instructions in kit exactly
+  (including boiling/steeping directions, required temps and timing)
+- made total mess of kitchen when trying to filter wert, to seperate trub from brew
+- lot of extra trub at bottom of fermenter & bottles
+- consider doing filtering using large strainer and small pot, to move wert
+  from brew pot to fermenter 
+- filled kitchen sink w/ice cubes and cold water in order to cold break wert.
+- should consider using large blocks of ice in cold water for better wert chilling results.
+- used bottling suger, instead of Muntons CarbTabs to carbonate bottles
+
+Rating: 7.5 of 10
+
+-----------------------------------------
+Date: 05/28/07
+Kit: Arbor Wine & Beer
+Type: Fire Island Pale Ale
+Size: 5.0 Gal
+
+Ingredents:
+- 2 cans of pre-hopped liquid malt
+- 1 packet Mutons Gold dry yeast
+- other assorted grains & hops
+
+Original Gravity: 1.044
+ABV: ~6.0
+Pitch Temp: 87 F
+
+Ferment Temp: 78 F
+
+Rack Date: 06/07/07 
+Final Gravity: 1.013
+
+Comments:
+- Second attempt at a partial grain beer kit
+- followed instructions in kit exactly & everything went smoothly
+  (including boiling/steeping directions, required temps and timing)
+- no kitchen mess this time, while trying to filter wert, to seperate trub from brew
+- filled kitchen sink w/ice cubes and cold water in order to cold break wert.
+- should consider using large blocks of ice in cold water for better wert chilling results.
+
+Rating: 8 of 10
+
+-----------------------------------------
+Date: 07/24/07
+Kit: Brewer's Best
+Type: Amber Lite
+Size: 5.0 Gal
+
+Ingredents:
+- 1 cans of pre-hopped liquid malt
+- 1 packet Nottingham dry yeast
+- other assorted grains & hops
+
+Original Gravity: 1.041
+ABV: ~5.0
+Pitch Temp: 90 F
+
+Ferment Temp: 80 F
+
+Rack Date: 07/30/07 
+Final Gravity: 1.008
+
+Comments:
+- no problems with this kit
+
+Rating: 7 of 10
+
+-----------------------------------------
+Date: 09/15/07
+Kit: 
+Type: Simple Red Wine
+Size: 1.0 Gal
+
+Ingredents:
+- 1 gallon welchers red grape juice
+- 1 packet Lavin wine dry yeast
+- 2 lbs table suger
+
+Original Gravity: 1.091
+ABV: ~10.0
+Pitch Temp: 80 F
+
+Ferment Temp: 80 F
+
+Rack Date: 10/07/07 
+Final Gravity: 0.990
+
+Comments:
+- fermeted very fast & feveristly
+- smells very sweet, but very rough drinking
+- hope this wine smooths out in time.
+
+Rating: 5 of 10
+
+-----------------------------------------
+Date: 09/16/07
+Kit: Brewer's Best
+Type: English Brown Ale
+Size: 5.0 Gal
+
+Ingredents:
+- 1 can liquid malt
+- 1 packet Nottingham dry yeast
+- assorted grains & hops
+
+Original Gravity: 1.042
+ABV: ~6.0
+Pitch Temp: 84 F
+
+Ferment Temp: 80 F
+
+Rack Date: 09/20/07 
+Final Gravity: 1.011
+
+Comments:
+- fermeted very fast & feveristly (completed in les then 48 hours)
+- added 1 packet Mutons Gold dry yeast on 09/19/07, thinking this was a failed fermentation or bad starting yeast
+- extra yeast did not help any.  It was already completed (FG reading next day showed this this, when nothing happened).
+
+Rating: 7 of 10
+
+-----------------------------------------
+Date: 10/07/07
+Kit: 
+Type: Hard Cider
+Size: 5.0 Gal
+
+Ingredents:
+- 5 gallon pathmark apple juice
+- 1 packet Mutons Gold dry yeast
+- 2 cans of frozen store brand apple juice concentrate
+- 3 lbs table suger
+
+Original Gravity: 1.500
+ABV: ~xx.x
+Pitch Temp: 74 F
+
+Ferment Temp: 78 F
+
+Rack Date: 10/07/07 
+Final Gravity: x.xxxx
+
+Comments:
+- fermeted very fast & feveristly
+- smells very sweet, but very rough drinking
+- hope this hard cider smooths out in time.
+- forgot to add frozen juice when started, so added the 2 cans on 10/26/07
+
+Rating: 6 of 10
+

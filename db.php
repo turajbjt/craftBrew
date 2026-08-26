@@ -1,72 +1,234 @@
 <?php
 /**
- * Database Singleton Helper
- * Supports SQLite (default) and MySQL backends.
+ * Database Helper Module using PHP PDO (MariaDB / MySQL)
+ * Includes Helpers for Structured Ingredients, Supplies, and Brewing Steps
  */
 
 require_once __DIR__ . '/config.php';
 
-class Database {
-    private static ?PDO $instance = null;
-
-    public static function getConnection(): PDO {
-        if (self::$instance === null) {
-            $engine = strtolower(defined('DB_ENGINE') ? DB_ENGINE : 'sqlite');
-            $options = [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
-            ];
-
+function get_db() {
+    static $pdo = null;
+    if ($pdo === null) {
+        $dsn = sprintf(
+            "mysql:host=%s;port=%s;dbname=%s;charset=%s",
+            DB_HOST,
+            DB_PORT,
+            DB_NAME,
+            DB_CHARSET
+        );
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+        try {
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
             try {
-                if ($engine === 'sqlite') {
-                    $sqlitePath = defined('DB_SQLITE_PATH') ? DB_SQLITE_PATH : __DIR__ . '/data/recurring_mgt.sqlite';
-                    $dbDir = dirname($sqlitePath);
-
-                    if (!is_dir($dbDir)) {
-                        if (!@mkdir($dbDir, 0777, true) && !is_dir($dbDir)) {
-                            die("Database Error: Unable to create database directory '{$dbDir}'. Please check folder permissions.\n");
-                        }
-                    }
-
-                    // Ensure write permissions on database folder for web server process
-                    @chmod($dbDir, 0777);
-
-                    $isNewDatabase = !file_exists($sqlitePath) || filesize($sqlitePath) === 0;
-
-                    if (!file_exists($sqlitePath)) {
-                        if (@touch($sqlitePath)) {
-                            @chmod($sqlitePath, 0666);
-                        }
-                    }
-
-                    $dsn = 'sqlite:' . $sqlitePath;
-                    self::$instance = new PDO($dsn, null, null, $options);
-                    self::$instance->exec("PRAGMA foreign_keys = ON;");
-
-                    // Auto-initialize SQLite schema if any core tables do not exist yet
-                    $checkSettingsTable = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='system_settings'")->fetch();
-                    $checkUsersTable    = self::$instance->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")->fetch();
-                    if (!$checkSettingsTable || !$checkUsersTable || $isNewDatabase) {
-                        self::initSqliteDatabase(self::$instance);
-                    }
-                } else {
-                    $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', DB_HOST, DB_PORT, DB_NAME);
-                    self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
-                }
-            } catch (PDOException $e) {
-                // Return a clean error if running CLI or Web
-                die("Database Connection Error: " . $e->getMessage() . "\n");
+                $rootDsn = sprintf("mysql:host=%s;port=%s;charset=%s", DB_HOST, DB_PORT, DB_CHARSET);
+                $rootPdo = new PDO($rootDsn, DB_USER, DB_PASS, $options);
+                $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+            } catch (Exception $e2) {
+                die("Database Connection Error: " . $e->getMessage());
             }
         }
-        return self::$instance;
     }
+    return $pdo;
+}
 
-    private static function initSqliteDatabase(PDO $pdo): void {
-        $schemaFile = __DIR__ . '/schema_sqlite.sql';
-        if (file_exists($schemaFile)) {
-            $sql = file_get_contents($schemaFile);
-            $pdo->exec($sql);
+/**
+ * Execute schema setup from schema.sql
+ */
+function init_schema() {
+    $db = get_db();
+    $schemaFile = __DIR__ . '/schema.sql';
+    if (file_exists($schemaFile)) {
+        $sql = file_get_contents($schemaFile);
+        $db->exec($sql);
+    }
+    // Ensure date_rack_2 and date_rack_3 columns exist
+    try {
+        $db->exec("ALTER TABLE batches ADD COLUMN date_rack_2 DATE NULL AFTER date_rack");
+    } catch (Exception $e) {}
+    try {
+        $db->exec("ALTER TABLE batches ADD COLUMN date_rack_3 DATE NULL AFTER date_rack_2");
+    } catch (Exception $e) {}
+}
+
+/**
+ * Calculate ABV from Original Gravity and Final Gravity
+ * Supports standard formula: (OG - FG) * 131.25
+ * Supports alternate high-gravity formula: (76.08 * (OG - FG) / (1.775 - OG)) * (FG / 0.794)
+ */
+function calculate_abv($og, $fg, $formula = 'standard') {
+    if (!$og || !$fg || $og <= 1.0 || $fg <= 0 || $og <= $fg) return 0.0;
+    if ($formula === 'alternate') {
+        if ($og >= 1.775) return round(($og - $fg) * 131.25, 2);
+        $abv = (76.08 * ($og - $fg) / (1.775 - $og)) * ($fg / 0.794);
+        return round($abv, 2);
+    }
+    $abv = ($og - $fg) * 131.25;
+    return round($abv, 2);
+}
+
+/**
+ * Fetch structured recipe details (ingredients, supplies, steps)
+ */
+function get_recipe_details($recipeId) {
+    $db = get_db();
+    
+    // Ingredients
+    $stIng = $db->prepare("SELECT * FROM recipe_ingredients WHERE recipe_id = ? ORDER BY id ASC");
+    $stIng->execute([$recipeId]);
+    $ingredients = $stIng->fetchAll();
+
+    // Supplies & Equipment
+    $stSup = $db->prepare("SELECT * FROM recipe_supplies WHERE recipe_id = ? ORDER BY id ASC");
+    $stSup->execute([$recipeId]);
+    $supplies = $stSup->fetchAll();
+
+    // Steps / Schedule
+    $stStp = $db->prepare("SELECT * FROM recipe_steps WHERE recipe_id = ? ORDER BY step_number ASC, id ASC");
+    $stStp->execute([$recipeId]);
+    $steps = $stStp->fetchAll();
+
+    return [
+        'ingredients' => $ingredients,
+        'supplies'    => $supplies,
+        'steps'       => $steps
+    ];
+}
+
+/**
+ * Save structured recipe details
+ */
+function save_recipe_details($recipeId, $ingredients = [], $supplies = [], $steps = []) {
+    $db = get_db();
+
+    // Delete existing items for clean replacement
+    $db->prepare("DELETE FROM recipe_ingredients WHERE recipe_id = ?")->execute([$recipeId]);
+    $db->prepare("DELETE FROM recipe_supplies WHERE recipe_id = ?")->execute([$recipeId]);
+    $db->prepare("DELETE FROM recipe_steps WHERE recipe_id = ?")->execute([$recipeId]);
+
+    // Save Ingredients
+    if (!empty($ingredients)) {
+        $insIng = $db->prepare("INSERT INTO recipe_ingredients (recipe_id, name, ingredient_type, amount, unit, stage_addition, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        foreach ($ingredients as $ing) {
+            $name = trim($ing['name'] ?? '');
+            if (!empty($name)) {
+                $insIng->execute([
+                    $recipeId,
+                    $name,
+                    $ing['ingredient_type'] ?? 'Fermentable',
+                    (float)($ing['amount'] ?? 0),
+                    trim($ing['unit'] ?? ''),
+                    trim($ing['stage_addition'] ?? 'Primary'),
+                    trim($ing['notes'] ?? '')
+                ]);
+            }
         }
     }
+
+    // Save Supplies
+    if (!empty($supplies)) {
+        $insSup = $db->prepare("INSERT INTO recipe_supplies (recipe_id, item_name, category, quantity, is_required, notes) VALUES (?, ?, ?, ?, ?, ?)");
+        foreach ($supplies as $sup) {
+            $itemName = trim($sup['item_name'] ?? '');
+            if (!empty($itemName)) {
+                $insSup->execute([
+                    $recipeId,
+                    $itemName,
+                    $sup['category'] ?? 'Equipment',
+                    trim($sup['quantity'] ?? '1 unit'),
+                    !empty($sup['is_required']) ? 1 : 0,
+                    trim($sup['notes'] ?? '')
+                ]);
+            }
+        }
+    }
+
+    // Save Steps
+    if (!empty($steps)) {
+        $insStp = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $num = 1;
+        foreach ($steps as $stp) {
+            $title = trim($stp['title'] ?? '');
+            if (!empty($title)) {
+                $insStp->execute([
+                    $recipeId,
+                    $num++,
+                    $stp['phase'] ?? 'Brew Day',
+                    $title,
+                    trim($stp['duration'] ?? ''),
+                    trim($stp['target_temp'] ?? ''),
+                    trim($stp['instructions'] ?? '')
+                ]);
+            }
+        }
+    }
+}
+
+/**
+ * Inventory Helpers
+ */
+function get_inventory($userId) {
+    $db = get_db();
+    $st = $db->prepare("SELECT * FROM inventory WHERE user_id = ? ORDER BY category ASC, item_name ASC");
+    $st->execute([$userId]);
+    return $st->fetchAll();
+}
+
+function save_inventory_item($userId, $data) {
+    $db = get_db();
+    $id = (int)($data['id'] ?? 0);
+    $name = trim($data['item_name'] ?? '');
+    $cat  = trim($data['category'] ?? 'Fermentable');
+    $qty  = (float)($data['quantity'] ?? 0);
+    $unit = trim($data['unit'] ?? '');
+    $notes = trim($data['notes'] ?? '');
+
+    if (empty($name)) return false;
+
+    if ($id > 0) {
+        $st = $db->prepare("UPDATE inventory SET item_name=?, category=?, quantity=?, unit=?, notes=? WHERE id=? AND user_id=?");
+        return $st->execute([$name, $cat, $qty, $unit, $notes, $id, $userId]);
+    } else {
+        $st = $db->prepare("INSERT INTO inventory (user_id, item_name, category, quantity, unit, notes) VALUES (?, ?, ?, ?, ?, ?)");
+        return $st->execute([$userId, $name, $cat, $qty, $unit, $notes]);
+    }
+}
+
+function delete_inventory_item($userId, $itemId) {
+    $db = get_db();
+    $st = $db->prepare("DELETE FROM inventory WHERE id = ? AND user_id = ?");
+    return $st->execute([$itemId, $userId]);
+}
+
+function deduct_inventory_for_batch($userId, $recipeId) {
+    if (!$recipeId) return 0;
+    $details = get_recipe_details($recipeId);
+    $ingredients = $details['ingredients'] ?? [];
+    if (empty($ingredients)) return 0;
+
+    $db = get_db();
+    $deductedCount = 0;
+
+    foreach ($ingredients as $ing) {
+        $name = trim($ing['name']);
+        $amount = (float)$ing['amount'];
+        if ($amount <= 0 || empty($name)) continue;
+
+        $st = $db->prepare("SELECT id, quantity FROM inventory WHERE user_id = ? AND LOWER(item_name) = LOWER(?) LIMIT 1");
+        $st->execute([$userId, $name]);
+        $inv = $st->fetch();
+
+        if ($inv) {
+            $newQty = max(0, (float)$inv['quantity'] - $amount);
+            $up = $db->prepare("UPDATE inventory SET quantity = ? WHERE id = ?");
+            $up->execute([$newQty, $inv['id']]);
+            $deductedCount++;
+        }
+    }
+    return $deductedCount;
 }

@@ -1,44 +1,37 @@
 <?php
 /**
- * System Configuration File
+ * Home & Craft Brewing System Configuration
+ * Database & Application Security Settings
  */
 
-// Timezone setup - system operates on GMT/UTC as specified
-date_default_timezone_set('UTC');
+// Application Info
+define('APP_NAME', 'CraftBrew Log & Recipe Manager');
+define('APP_VERSION', '2.0.0');
 
-// Database Configuration (Supported engines: 'sqlite', 'mysql')
-define('DB_ENGINE', getenv('DB_ENGINE') ?: 'sqlite');
-define('DB_SQLITE_PATH', getenv('DB_SQLITE_PATH') ?: __DIR__ . '/data/recurring_mgt.sqlite');
-
+// MariaDB / MySQL Configuration
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'recurring_mgt');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: 'rootpassword');
+define('DB_NAME', getenv('DB_NAME') ?: 'craftbrew');
+define('DB_USER', getenv('DB_USER') ?: 'brewuser');
+define('DB_PASS', getenv('DB_PASS') ?: 'brewpassword');
+define('DB_CHARSET', 'utf8mb4');
 
-// Initialize dynamic settings service
-require_once __DIR__ . '/includes/SettingsService.php';
-SettingsService::initConstants();
-
-// Date & Time Utility Functions
-function get_gmt_now_formatted() {
-    return date('YmdHis'); // YYYYMMDDhhmmss GMT
+// Secure Session Cookie Settings
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_samesite', 'Lax');
+    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+        ini_set('session.cookie_secure', 1);
+    }
+    session_start();
 }
 
-function get_gmt_today_date() {
-    return date('Ymd'); // YYYYMMDD GMT
-}
+// Upload & Document Settings
+define('DOC_UPLOAD_DIR', __DIR__ . '/assets/docs/');
+define('MAX_UPLOAD_SIZE', 25 * 1024 * 1024); // 25 MB
 
-function mask_card_number($cardNumber) {
-    $clean = preg_replace('/\D/', '', $cardNumber);
-    if (strlen($clean) < 4) return 'XXXX-XXXX-XXXX-XXXX';
-    $last4 = substr($clean, -4);
-    return 'XXXX-XXXX-XXXX-' . $last4;
-}
-
-function mask_account_number($accNum) {
-    if (empty($accNum)) return '';
-    $clean = preg_replace('/\D/', '', $accNum);
-    if (strlen($clean) < 4) return 'XXXX-XXXX';
-    return 'XXXX-' . substr($clean, -4);
-}
+// Error reporting settings
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Hide errors from public output for security
+ini_set('log_errors', 1);
