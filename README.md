@@ -101,7 +101,7 @@ When upgrading from an earlier version:
 
 1. Clone or navigate to the project directory:
    ```bash
-   cd /home/turajb/Ext4Data/git/brewSite
+   cd ./brewSite
    ```
 
 2. Launch Docker services (MariaDB 10.11 + PHP 8.2 Apache):
@@ -123,7 +123,7 @@ When upgrading from an earlier version:
 ## 📂 Project Directory Overview
 
 ```
-/home/turajb/Ext4Data/git/brewSite/
+./brewSite/
 ├── config.php                  # Application security & MariaDB PDO configuration
 ├── db.php                      # MariaDB PDO connection helper & ABV calculator
 ├── schema.sql                  # MariaDB database schema definition
