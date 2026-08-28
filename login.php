@@ -90,6 +90,12 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($_GET['msg']) && $_GET['msg'] === 'account_suspended'): ?>
+            <div style="background: #ffe4e6; color: #9f1239; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #fecdd3;">
+                Your account is suspended or inactive. Please contact the site administrator.
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($error)): ?>
             <div style="background: #ffe4e6; color: #9f1239; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
                 <?= e($error) ?>
@@ -100,13 +106,19 @@ require_once __DIR__ . '/includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
             
             <div class="form-group">
-                <label class="form-label" for="username">Username or Email</label>
-                <input type="text" id="username" name="username" class="form-control" required placeholder="brewer" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" for="username" style="margin-bottom: 0;">Username or Email</label>
+                    <a href="forgot_username.php" style="font-size: 0.8rem; color: var(--primary-color);">Forgot Username?</a>
+                </div>
+                <input type="text" id="username" name="username" class="form-control" required placeholder="brewer" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" style="margin-top: 0.35rem;">
             </div>
 
             <div class="form-group">
-                <label class="form-label" for="password">Password</label>
-                <input type="password" id="password" name="password" class="form-control" required placeholder="••••••••">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label class="form-label" for="password" style="margin-bottom: 0;">Password</label>
+                    <a href="forgot_password.php" style="font-size: 0.8rem; color: var(--primary-color);">Forgot Password?</a>
+                </div>
+                <input type="password" id="password" name="password" class="form-control" required placeholder="••••••••" style="margin-top: 0.35rem;">
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Log In</button>

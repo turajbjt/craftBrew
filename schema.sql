@@ -1,5 +1,5 @@
 -- MariaDB / MySQL Schema for Home & Craft Brewing System
--- Supports Multi-user Auth, Recipes, Structured Ingredients, Supplies, Steps, Batches, Readings, and Documents
+-- Supports Multi-user Auth, RBAC, User Management, Security Governance, Recipes, Ingredients, Batches, and Documents
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'brewer',
+    status ENUM('active', 'suspended', 'banned') NOT NULL DEFAULT 'active',
+    can_manage_docs TINYINT(1) DEFAULT 0,
+    must_change_password TINYINT(1) DEFAULT 0,
+    password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     api_token VARCHAR(64) UNIQUE NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -45,20 +49,20 @@ CREATE TABLE IF NOT EXISTS recipes (
     FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Structured Recipe Ingredients Table
 CREATE TABLE IF NOT EXISTS recipe_ingredients (
     id INT AUTO_INCREMENT PRIMARY KEY,
     recipe_id INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    ingredient_type VARCHAR(50) NOT NULL DEFAULT 'Fermentable',
-    amount DECIMAL(8,2) DEFAULT 0.00,
-    unit VARCHAR(20) DEFAULT '',
+    ingredient_type ENUM('Fermentable', 'Hop', 'Yeast', 'Additive', 'Fining', 'Water', 'Other') DEFAULT 'Fermentable',
+    amount DECIMAL(8,3) NOT NULL DEFAULT 0.000,
+    unit VARCHAR(20) DEFAULT 'lbs',
     stage_addition VARCHAR(50) DEFAULT 'Primary',
-    notes TEXT,
+    notes VARCHAR(255) DEFAULT '',
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Structured Recipe Supplies & Equipment Table
 CREATE TABLE IF NOT EXISTS recipe_supplies (
     id INT AUTO_INCREMENT PRIMARY KEY,
     recipe_id INT NOT NULL,
@@ -66,38 +70,39 @@ CREATE TABLE IF NOT EXISTS recipe_supplies (
     category VARCHAR(50) DEFAULT 'Equipment',
     quantity VARCHAR(50) DEFAULT '1 unit',
     is_required TINYINT(1) DEFAULT 1,
-    notes TEXT,
+    notes VARCHAR(255) DEFAULT '',
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Structured Recipe Process Steps Table
 CREATE TABLE IF NOT EXISTS recipe_steps (
     id INT AUTO_INCREMENT PRIMARY KEY,
     recipe_id INT NOT NULL,
     step_number INT NOT NULL,
-    phase VARCHAR(50) NOT NULL DEFAULT 'Brew Day',
-    title VARCHAR(150) NOT NULL,
-    duration VARCHAR(50) DEFAULT '',
-    target_temp VARCHAR(30) DEFAULT '',
-    instructions TEXT,
+    step_name VARCHAR(100) NOT NULL,
+    target_temp_f VARCHAR(10) DEFAULT '',
+    duration_minutes INT DEFAULT 0,
+    description TEXT,
+    sort_order INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS batches (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    recipe_id INT NULL,
+    recipe_id INT DEFAULT NULL,
     category_id INT NOT NULL,
-    batch_code VARCHAR(50) DEFAULT '',
     batch_name VARCHAR(100) NOT NULL,
     batch_type VARCHAR(50) DEFAULT '',
     batch_style VARCHAR(100) DEFAULT '',
     batch_size_gal DECIMAL(6,2) DEFAULT 5.00,
-    date_start DATE NULL,
-    date_rack DATE NULL,
-    date_rack_2 DATE NULL,
-    date_rack_3 DATE NULL,
-    date_bottle DATE NULL,
+    date_start DATE DEFAULT NULL,
+    date_rack DATE DEFAULT NULL,
+    date_rack_2 DATE DEFAULT NULL,
+    date_rack_3 DATE DEFAULT NULL,
+    date_bottle DATE DEFAULT NULL,
     pitch_temp_f VARCHAR(10) DEFAULT '',
     ferment_temp_f VARCHAR(10) DEFAULT '',
     gravity_og DECIMAL(4,3) DEFAULT NULL,
@@ -107,15 +112,14 @@ CREATE TABLE IF NOT EXISTS batches (
     calculated_abv DECIMAL(4,2) DEFAULT NULL,
     ingredients TEXT,
     boil_notes TEXT,
-    tasting_notes TEXT,
     reflections TEXT,
-    rating TINYINT UNSIGNED DEFAULT 0,
-    status VARCHAR(30) NOT NULL DEFAULT 'Primary',
+    rating INT DEFAULT 0,
+    status VARCHAR(30) DEFAULT 'Primary',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id),
-    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS fermentation_readings (
@@ -164,3 +168,42 @@ CREATE TABLE IF NOT EXISTS login_attempts (
     attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_ip_user (ip_address, username, attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Self-Service Account Recovery Attempts
+CREATE TABLE IF NOT EXISTS recovery_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    request_type VARCHAR(20) NOT NULL, -- 'username' or 'password'
+    identifier VARCHAR(100) NOT NULL,
+    attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_recovery (ip_address, request_type, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Global IP Blocklist Table
+CREATE TABLE IF NOT EXISTS blocked_ips (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL UNIQUE,
+    reason VARCHAR(255) DEFAULT '',
+    blocked_by_admin_id INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NULL,
+    INDEX idx_blocked_ip (ip_address)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Site Settings Table
+CREATE TABLE IF NOT EXISTS site_settings (
+    setting_key VARCHAR(50) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO site_settings (setting_key, setting_value) VALUES
+('password_rotation_days', '0'),
+('password_min_length', '8'),
+('password_require_complex', '0'),
+('registration_mode', 'open'),
+('max_login_attempts', '5'),
+('lockout_minutes', '15'),
+('max_recovery_attempts', '3'),
+('recovery_lockout_minutes', '15')
+ON DUPLICATE KEY UPDATE setting_key=setting_key;

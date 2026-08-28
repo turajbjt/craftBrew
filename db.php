@@ -95,6 +95,27 @@ function run_migrations($db = null) {
         $logs[] = "Verified column: documents.original_filename";
     } catch (Exception $e) {}
 
+    // Users table RBAC and security columns
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN status ENUM('active', 'suspended', 'banned') NOT NULL DEFAULT 'active' AFTER role");
+        $logs[] = "Verified column: users.status";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN can_manage_docs TINYINT(1) DEFAULT 0 AFTER status");
+        $logs[] = "Verified column: users.can_manage_docs";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) DEFAULT 0 AFTER can_manage_docs");
+        $logs[] = "Verified column: users.must_change_password";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER must_change_password");
+        $logs[] = "Verified column: users.password_changed_at";
+    } catch (Exception $e) {}
+
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS login_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -104,6 +125,55 @@ function run_migrations($db = null) {
             INDEX idx_ip_user (ip_address, username, attempted_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
         $logs[] = "Verified table: login_attempts";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS recovery_attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(45) NOT NULL,
+            request_type VARCHAR(20) NOT NULL,
+            identifier VARCHAR(100) NOT NULL,
+            attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_recovery (ip_address, request_type, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $logs[] = "Verified table: recovery_attempts";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS blocked_ips (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(45) NOT NULL UNIQUE,
+            reason VARCHAR(255) DEFAULT '',
+            blocked_by_admin_id INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME NULL,
+            INDEX idx_blocked_ip (ip_address)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $logs[] = "Verified table: blocked_ips";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS site_settings (
+            setting_key VARCHAR(50) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $defaultSettings = [
+            'password_rotation_days'    => '0',
+            'password_min_length'       => '8',
+            'password_require_complex'  => '0',
+            'registration_mode'         => 'open',
+            'max_login_attempts'        => '5',
+            'lockout_minutes'           => '15',
+            'max_recovery_attempts'     => '3',
+            'recovery_lockout_minutes'  => '15'
+        ];
+        $setStmt = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=setting_key");
+        foreach ($defaultSettings as $k => $v) {
+            $setStmt->execute([$k, $v]);
+        }
+        $logs[] = "Verified table & defaults: site_settings";
     } catch (Exception $e) {}
 
     // 3. Ensure standard categories exist

@@ -1,17 +1,22 @@
-# CraftBrew - Home & Craft Brewing Log & Recipe Management System
+# CraftBrew - Home & Craft Brewing Platform (v2.3.0)
 
-A multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for homebrewers to formulate recipes, track fermentation logs, record hydrometer readings, generate printable PDF sheets, access reference documents, and connect companion Android applications via RESTful JSON API.
+A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for craft brewers to formulate recipes, track fermentation logs, record hydrometer readings, manage cellar inventory, analyze brewing demographics, and access reference documentation.
 
 ---
 
-## 🌟 Features
+## 🌟 Key Platform Features (v2.3.0)
 
-1. **Recipe Book & Formulator**:
-   - Create, edit, and share brewing formulas for **Beer**, **Wine**, **Cider**, **Mead**, and **Fruit Wine**.
-   - Structured **Ingredients Breakdown** (Fermentables, Hops, Yeast, Additives/Finings, Water).
-   - Structured **Equipment & Supplies Checklist** (Carboys, Air Locks, Hydrometers, StarSan, Auto-Siphons, Caps).
-   - Structured **Step-by-Step Brewing Schedule** with target temperatures (°F) and step durations.
-   - 1-click **"Start Batch from Recipe"** button to launch new brew logs.
+1. **👑 Site Owner & Administrator Portal (`/admin/`)**:
+   - **User Management & Lifecycle**: Provision, edit, block, or delete users; change passwords directly; generate 1-time temporary passphrases; force password reset on next login.
+   - **Security Policies & Password Rotation**: Enforce password rotation (60/90/180/365 days), password complexity rules, registration governance (Open/Invite/Closed), and brute-force lockout thresholds.
+   - **IP Firewall & Security Threat Alerts**: Manual and automated IP blocklist with threat alert banners for suspicious authentication activity.
+   - **Demographics & Analytics Dashboard**: Chart.js telemetry covering beverage categories, ABV distributions, user growth timeline, top styles, and 1-click CSV exports.
+   - **System Legacy Importer**: Relocated to admin area for secured historical log importing.
+
+2. **🔑 Self-Service Account Recovery**:
+   - **Username Recovery (`forgot_username.php`)**: Anti-enumeration zero-information design with rate-limiting.
+   - **Password Reset (`forgot_password.php`)**: Dispatches secure 1-time temporary passwords without leaking account existence.
+   - **Mandatory Password Reset (`change_password.php`)**: Enforces complexity rules for temporary/expired credentials.
 
 2. **Brew Batch & Fermentation Tracker**:
    - Stages: **Planning** -> **Primary Fermentation** -> **Secondary / Racking** -> **Bottling / Aging** -> **Completed**.

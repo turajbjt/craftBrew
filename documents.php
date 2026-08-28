@@ -9,6 +9,8 @@ $db = get_db();
 $message = '';
 $error = '';
 
+$canManage = can_manage_documents($user);
+
 // Secure file viewer handling with strict path traversal prevention
 if (isset($_GET['action']) && $_GET['action'] === 'view' && !empty($_GET['id'])) {
     $docId = sanitize_int($_GET['id']);
@@ -34,7 +36,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'view' && !empty($_GET['id']))
                 } else {
                     header('Content-Type: text/plain; charset=utf-8');
                 }
-                header('Content-Disposition: inline; filename="' . $filename . '"');
+                $displayFilename = !empty($doc['original_filename']) ? $doc['original_filename'] : $filename;
+                header('Content-Disposition: inline; filename="' . addslashes($displayFilename) . '"');
                 header('X-Content-Type-Options: nosniff');
                 readfile($realPath);
                 exit;
@@ -45,8 +48,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'view' && !empty($_GET['id']))
     die("File not found or access denied.");
 }
 
-// Handle Upload Document
+// Handle Upload Document (Admin / Permitted Only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload') {
+    if (!$canManage) {
+        http_response_code(403);
+        die("Access Denied: You do not have permission to upload reference documents.");
+    }
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = "Security validation failed (CSRF token error).";
     } else {
@@ -61,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $allowedExtensions = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
 
             if (in_array($ext, $allowedExtensions)) {
-                // Verify binary magic-byte MIME type
                 $finfo = finfo_open(FILEINFO_MIME_TYPE);
                 $detectedMime = finfo_file($finfo, $tmpFile);
                 finfo_close($finfo);
@@ -82,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         @mkdir(DOC_UPLOAD_DIR, 0777, true);
                         @chmod(DOC_UPLOAD_DIR, 0777);
                     }
-                    // Generate safe randomized storage filename
                     $safeDiskFilename = bin2hex(random_bytes(16)) . '.' . $ext;
                     $targetPath = DOC_UPLOAD_DIR . $safeDiskFilename;
 
@@ -109,8 +114,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Handle Delete Document
+// Handle Delete Document (Admin / Permitted Only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
+    if (!$canManage) {
+        http_response_code(403);
+        die("Access Denied: You do not have permission to delete reference documents.");
+    }
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = "Security validation failed (CSRF token error).";
     } else {
@@ -142,13 +151,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Handle Scan & Fix Missing Files from Direct Upload Storage
+// Handle Scan & Fix Missing Files (Admin / Permitted Only)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'scan_fix') {
+    if (!$canManage) {
+        http_response_code(403);
+        die("Access Denied: You do not have permission to scan library storage.");
+    }
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = "Security validation failed (CSRF token error).";
     } else {
         if (!is_dir(DOC_UPLOAD_DIR)) {
-            mkdir(DOC_UPLOAD_DIR, 0755, true);
+            @mkdir(DOC_UPLOAD_DIR, 0777, true);
+            @chmod(DOC_UPLOAD_DIR, 0777);
         }
 
         $allowed = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
@@ -156,7 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $addedCount = 0;
         $cleanedCount = 0;
 
-        // 1. Find files in uploads/documents/ that are missing from database index
         foreach ($filesOnDisk as $filePath) {
             $filename = basename($filePath);
             $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
@@ -167,16 +180,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!$chk->fetch()) {
                 $fileType = $ext === 'pdf' ? 'PDF Document' : ($ext === 'txt' ? 'Text Note' : 'Image');
                 $title = pathinfo($filename, PATHINFO_FILENAME);
-                $title = preg_replace('/^\d+_/', '', $title);
+                $title = preg_replace('/^[a-f0-9]{32}\./i', '', $title);
                 $title = ucwords(str_replace(['_', '-'], ' ', $title));
                 
-                $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, file_type, description) VALUES (?, ?, 'Reference', ?, ?, ?)");
-                $ins->execute([$user['id'], $title, $filename, $fileType, 'Restored from upload storage']);
+                $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, original_filename, file_type, description) VALUES (?, ?, 'Reference', ?, ?, ?, ?)");
+                $ins->execute([$user['id'], $title, $filename, $filename, $fileType, 'Restored from upload storage']);
                 $addedCount++;
             }
         }
 
-        // 2. Clean up any database records whose physical files are missing on disk
         $allDocs = $db->query("SELECT id, filename FROM documents")->fetchAll();
         foreach ($allDocs as $docRow) {
             $docFilePath = DOC_UPLOAD_DIR . basename($docRow['filename']);
@@ -209,16 +221,20 @@ require_once __DIR__ . '/includes/header.php';
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
     <div>
         <h1>📚 Brewing Document & Reference Library</h1>
-        <p style="color: var(--text-muted);">Upload, view, and organize brewing guides, cider handbooks, recipe notes, and PDF references.</p>
+        <p style="color: var(--text-muted);">
+            <?= $canManage ? 'Upload, view, and organize brewing guides, cider handbooks, recipe notes, and PDF references.' : 'Browse and view reference brewing guides, cider handbooks, and PDF documentation.' ?>
+        </p>
     </div>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <button type="button" class="btn btn-primary" onclick="openDocModal()">📤 Upload Document</button>
-        <form method="POST" action="documents.php" style="margin: 0;">
-            <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-            <input type="hidden" name="action" value="scan_fix">
-            <button type="submit" class="btn btn-secondary">🔍 Scan & Fix Missing Files</button>
-        </form>
-    </div>
+    <?php if ($canManage): ?>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="button" class="btn btn-primary" onclick="openDocModal()">📤 Upload Document</button>
+            <form method="POST" action="documents.php" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                <input type="hidden" name="action" value="scan_fix">
+                <button type="submit" class="btn btn-secondary">🔍 Scan & Fix Missing Files</button>
+            </form>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php if (!empty($message)): ?>
@@ -235,7 +251,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <?php if (empty($documents)): ?>
     <div class="card" style="text-align: center; color: var(--text-muted); padding: 3rem;">
-        No reference documents in your library. Click <strong>📤 Upload Document</strong> or run <strong>🔍 Scan & Fix Missing Files</strong> to find any unindexed files in storage!
+        No reference documents in your library yet.
     </div>
 <?php else: ?>
     <div class="card-grid">
@@ -251,18 +267,21 @@ require_once __DIR__ . '/includes/header.php';
 
                 <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
                     <a href="documents.php?action=view&id=<?= (int)$d['id'] ?>" class="btn btn-primary btn-sm" target="_blank">📖 View File</a>
-                    <form method="POST" action="documents.php" onsubmit="return confirm('Are you sure you want to delete this document?');" style="margin: 0;">
-                        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="<?= (int)$d['id'] ?>">
-                        <button type="submit" class="btn btn-logout btn-sm">Delete</button>
-                    </form>
+                    <?php if ($canManage): ?>
+                        <form method="POST" action="documents.php" onsubmit="return confirm('Are you sure you want to delete this document?');" style="margin: 0;">
+                            <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="id" value="<?= (int)$d['id'] ?>">
+                            <button type="submit" class="btn btn-logout btn-sm">Delete</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
 
+<?php if ($canManage): ?>
 <!-- Modal for Document Upload -->
 <div id="docModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 1rem;">
     <div style="background: #ffffff; width: 100%; max-width: 500px; padding: 1.5rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
@@ -312,5 +331,6 @@ function closeDocModal() {
     document.getElementById('docModal').style.display = 'none';
 }
 </script>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
