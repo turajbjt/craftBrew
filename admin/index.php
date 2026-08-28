@@ -67,31 +67,36 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 <?php endif; ?>
 
-<!-- KPI Metrics Grid -->
-<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 2rem;">
-    <div class="card stat-card">
-        <div class="stat-val"><?= $totalUsers ?></div>
-        <div class="stat-lbl">👥 Registered Users</div>
+<!-- Consolidated Single-Row KPI Metrics Bar -->
+<div class="card" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; margin-bottom: 1.75rem; gap: 1rem; overflow-x: auto;">
+    <div style="text-align: center; flex: 1; min-width: 100px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: var(--primary-color); line-height: 1.1;"><?= $totalUsers ?></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">👥 Users</div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-val"><?= $activeUsers ?></div>
-        <div class="stat-lbl">🔥 Active Brewers (30d)</div>
+    <div style="border-left: 1px solid var(--border); height: 35px;"></div>
+    <div style="text-align: center; flex: 1; min-width: 100px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: #10b981; line-height: 1.1;"><?= $activeUsers ?></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">🔥 Active (30d)</div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-val"><?= $totalRecipes ?></div>
-        <div class="stat-lbl">📖 Total Recipes</div>
+    <div style="border-left: 1px solid var(--border); height: 35px;"></div>
+    <div style="text-align: center; flex: 1; min-width: 100px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: var(--primary-color); line-height: 1.1;"><?= $totalRecipes ?></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">📖 Recipes</div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-val"><?= $totalBatches ?></div>
-        <div class="stat-lbl">🧪 Batches Brewed</div>
+    <div style="border-left: 1px solid var(--border); height: 35px;"></div>
+    <div style="text-align: center; flex: 1; min-width: 100px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: var(--primary-color); line-height: 1.1;"><?= $totalBatches ?></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">🧪 Batches</div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-val"><?= number_format($totalGallons, 1) ?> Gal</div>
-        <div class="stat-lbl">🍺 Total Volume Brewed</div>
+    <div style="border-left: 1px solid var(--border); height: 35px;"></div>
+    <div style="text-align: center; flex: 1; min-width: 110px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: #f59e0b; line-height: 1.1;"><?= number_format($totalGallons, 1) ?> <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted);">Gal</span></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">🍺 Volume</div>
     </div>
-    <div class="card stat-card">
-        <div class="stat-val"><?= $blockedIpCount ?></div>
-        <div class="stat-lbl">🚫 Active Blocked IPs</div>
+    <div style="border-left: 1px solid var(--border); height: 35px;"></div>
+    <div style="text-align: center; flex: 1; min-width: 100px;">
+        <div style="font-size: 1.6rem; font-weight: 800; color: <?= $blockedIpCount > 0 ? '#ef4444' : 'var(--text-muted)' ?>; line-height: 1.1;"><?= $blockedIpCount ?></div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 0.25rem; font-weight: 600;">🚫 Blocked IPs</div>
     </div>
 </div>
 

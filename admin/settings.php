@@ -14,18 +14,20 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_settings') {
     require_csrf_token();
 
-    $rotationDays   = sanitize_int($_POST['password_rotation_days'] ?? 0);
-    $minLen         = max(6, min(32, sanitize_int($_POST['password_min_length'] ?? 8)));
-    $requireComplex = !empty($_POST['password_require_complex']) ? '1' : '0';
-    $regMode        = validate_enum($_POST['registration_mode'] ?? '', ['open', 'invite', 'closed'], 'open');
-    $maxLogin       = max(3, min(20, sanitize_int($_POST['max_login_attempts'] ?? 5)));
-    $lockoutMins    = max(5, min(1440, sanitize_int($_POST['lockout_minutes'] ?? 15)));
-    $maxRec         = max(1, min(10, sanitize_int($_POST['max_recovery_attempts'] ?? 3)));
-    $recLockoutMins = max(5, min(1440, sanitize_int($_POST['recovery_lockout_minutes'] ?? 15)));
+    $rotationDays     = sanitize_int($_POST['password_rotation_days'] ?? 0);
+    $minLen           = max(6, min(32, sanitize_int($_POST['password_min_length'] ?? 8)));
+    $requireComplex   = !empty($_POST['password_require_complex']) ? '1' : '0';
+    $requireAlphaNum  = !empty($_POST['username_require_alphanumeric']) ? '1' : '0';
+    $regMode          = validate_enum($_POST['registration_mode'] ?? '', ['open', 'invite', 'closed'], 'open');
+    $maxLogin         = max(3, min(20, sanitize_int($_POST['max_login_attempts'] ?? 5)));
+    $lockoutMins      = max(5, min(1440, sanitize_int($_POST['lockout_minutes'] ?? 15)));
+    $maxRec           = max(1, min(10, sanitize_int($_POST['max_recovery_attempts'] ?? 3)));
+    $recLockoutMins   = max(5, min(1440, sanitize_int($_POST['recovery_lockout_minutes'] ?? 15)));
 
     set_site_setting('password_rotation_days', (string)$rotationDays);
     set_site_setting('password_min_length', (string)$minLen);
     set_site_setting('password_require_complex', $requireComplex);
+    set_site_setting('username_require_alphanumeric', $requireAlphaNum);
     set_site_setting('registration_mode', $regMode);
     set_site_setting('max_login_attempts', (string)$maxLogin);
     set_site_setting('lockout_minutes', (string)$lockoutMins);
@@ -36,14 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Current values
-$currentRotation   = (int)get_site_setting('password_rotation_days', 0);
-$currentMinLen     = (int)get_site_setting('password_min_length', 8);
-$currentComplex    = (bool)get_site_setting('password_require_complex', 0);
-$currentRegMode    = get_site_setting('registration_mode', 'open');
-$currentMaxLogin   = (int)get_site_setting('max_login_attempts', 5);
-$currentLockout    = (int)get_site_setting('lockout_minutes', 15);
-$currentMaxRec     = (int)get_site_setting('max_recovery_attempts', 3);
-$currentRecLockout = (int)get_site_setting('recovery_lockout_minutes', 15);
+$currentRotation         = (int)get_site_setting('password_rotation_days', 0);
+$currentMinLen           = (int)get_site_setting('password_min_length', 8);
+$currentComplex          = (bool)get_site_setting('password_require_complex', 0);
+$currentRequireAlphaNum  = (bool)get_site_setting('username_require_alphanumeric', 0);
+$currentRegMode          = get_site_setting('registration_mode', 'open');
+$currentMaxLogin         = (int)get_site_setting('max_login_attempts', 5);
+$currentLockout          = (int)get_site_setting('lockout_minutes', 15);
+$currentMaxRec           = (int)get_site_setting('max_recovery_attempts', 3);
+$currentRecLockout       = (int)get_site_setting('recovery_lockout_minutes', 15);
 
 $csrfToken = generate_csrf_token();
 $pageTitle = "Security & Policy Settings - Admin Portal";
@@ -96,6 +99,19 @@ require_once __DIR__ . '/../includes/header.php';
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" name="password_require_complex" value="1" <?= $currentComplex ? 'checked' : '' ?>>
                 <span>Enforce mixed-case letters (A-Z, a-z), numbers (0-9), and special characters (!@#$%^&*)</span>
+            </label>
+        </div>
+
+        <!-- Username Policy & Governance -->
+        <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
+            <label class="form-label" style="font-size: 1rem; font-weight: 700;">🏷️ Username Policy &amp; Security</label>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
+                The system automatically blocks reserved staff titles (<code>admin</code>, <code>root</code>, <code>support</code>, <code>staff</code>) and system commands/routes (<code>api</code>, <code>login</code>, <code>exec</code>, <code>test</code>) across all registrations.
+            </p>
+            
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
+                <input type="checkbox" name="username_require_alphanumeric" value="1" <?= $currentRequireAlphaNum ? 'checked' : '' ?>>
+                <span>Require usernames to contain both letters (A-Z) and numbers (0-9)</span>
             </label>
         </div>
 

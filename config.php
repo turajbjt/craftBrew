@@ -6,7 +6,7 @@
 
 // Application Info
 define('APP_NAME', 'CraftBrew Log & Recipe Manager');
-define('APP_VERSION', '2.3.0');
+define('APP_VERSION', '2.4.0');
 
 // MariaDB / MySQL Configuration
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');

@@ -50,28 +50,32 @@ check_ip_blocklist();
 /**
  * Site Settings Helpers
  */
+$GLOBAL_SETTINGS_CACHE = [];
+
 function get_site_setting($key, $default = '') {
-    static $settingsCache = [];
-    if (isset($settingsCache[$key])) {
-        return $settingsCache[$key];
+    global $GLOBAL_SETTINGS_CACHE;
+    if (isset($GLOBAL_SETTINGS_CACHE[$key])) {
+        return $GLOBAL_SETTINGS_CACHE[$key];
     }
     try {
         $db = get_db();
         $stmt = $db->prepare("SELECT setting_value FROM site_settings WHERE setting_key = ?");
         $stmt->execute([$key]);
         $val = $stmt->fetchColumn();
-        $settingsCache[$key] = ($val !== false) ? $val : $default;
-        return $settingsCache[$key];
+        $GLOBAL_SETTINGS_CACHE[$key] = ($val !== false) ? $val : $default;
+        return $GLOBAL_SETTINGS_CACHE[$key];
     } catch (Exception $e) {
         return $default;
     }
 }
 
 function set_site_setting($key, $value) {
+    global $GLOBAL_SETTINGS_CACHE;
     try {
         $db = get_db();
         $stmt = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
         $stmt->execute([$key, (string)$value]);
+        $GLOBAL_SETTINGS_CACHE[$key] = (string)$value;
         return true;
     } catch (Exception $e) {
         return false;
@@ -299,6 +303,89 @@ function can_manage_documents($user = null) {
     }
     if (!$user) return false;
     return ($user['role'] === 'admin' || !empty($user['can_manage_docs']));
+}
+
+/**
+ * Reserved & Disallowed Usernames List
+ * System commands, staff titles, URL endpoints, and keywords
+ */
+function get_reserved_usernames() {
+    return [
+        // Staff, roles, and administrative
+        'admin', 'administrator', 'root', 'owner', 'moderator', 'mod', 'staff',
+        'support', 'help', 'billing', 'security', 'official', 'master', 'manager',
+        'sysadmin', 'webmaster', 'hostmaster', 'postmaster', 'abuse', 'contact',
+        'info', 'team', 'craftbrew', 'guest', 'system', 'superuser', 'operator',
+        'tester', 'developer', 'dev', 'service', 'daemon',
+        // System routes, actions, and API commands
+        'api', 'login', 'logout', 'register', 'install', 'setup', 'config', 'settings',
+        'index', 'dashboard', 'recipes', 'batches', 'calculators', 'documents',
+        'inventory', 'export', 'import', 'account', 'profile', 'user', 'users',
+        'search', 'auth', 'download', 'upload', 'edit', 'delete', 'update', 'status',
+        // System keywords & code execution words
+        'null', 'undefined', 'void', 'eval', 'exec', 'system', 'passthru', 'shell',
+        'test', 'true', 'false', 'localhost', 'anonymous'
+    ];
+}
+
+/**
+ * Username Policy & Governance Validation
+ * - Length: 3 to 30 characters
+ * - Characters: Alphanumeric, dashes (-), underscores (_)
+ * - Disallows commands and company/staff reserved names
+ * - Optional enforcement: requires both letters & numbers (disabled by default)
+ * - Case-insensitive database uniqueness check
+ */
+function validate_username($username, &$errorMsg = '', $ignoreUserId = null) {
+    $username = trim((string)$username);
+    $len = strlen($username);
+
+    if ($len < 3 || $len > 30) {
+        $errorMsg = "Username must be between 3 and 30 characters in length.";
+        return false;
+    }
+
+    if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $username)) {
+        $errorMsg = "Username may only contain letters, numbers, hyphens (-), and underscores (_).";
+        return false;
+    }
+
+    // Check reserved names
+    $lower = strtolower($username);
+    $reserved = get_reserved_usernames();
+    if (in_array($lower, $reserved, true)) {
+        $errorMsg = "The username '{$username}' is reserved by the system and cannot be used.";
+        return false;
+    }
+
+    // Optional rule: require both letters AND numbers
+    $requireAlphaNum = (bool)get_site_setting('username_require_alphanumeric', 0);
+    if ($requireAlphaNum) {
+        $hasLetter = (bool)preg_match('/[a-zA-Z]/', $username);
+        $hasDigit  = (bool)preg_match('/[0-9]/', $username);
+        if (!$hasLetter || !$hasDigit) {
+            $errorMsg = "Username policy requires at least one letter and at least one number.";
+            return false;
+        }
+    }
+
+    // Check database uniqueness
+    try {
+        $db = get_db();
+        if ($ignoreUserId) {
+            $stmt = $db->prepare("SELECT id FROM users WHERE LOWER(username) = ? AND id != ?");
+            $stmt->execute([$lower, (int)$ignoreUserId]);
+        } else {
+            $stmt = $db->prepare("SELECT id FROM users WHERE LOWER(username) = ?");
+            $stmt->execute([$lower]);
+        }
+        if ($stmt->fetch()) {
+            $errorMsg = "This username is already taken. Please choose another.";
+            return false;
+        }
+    } catch (Exception $e) {}
+
+    return true;
 }
 
 /**

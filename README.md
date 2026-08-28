@@ -1,14 +1,15 @@
-# CraftBrew - Home & Craft Brewing Platform (v2.3.0)
+# CraftBrew - Home & Craft Brewing Platform (v2.4.0)
 
 A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for craft brewers to formulate recipes, track fermentation logs, record hydrometer readings, manage cellar inventory, analyze brewing demographics, and access reference documentation.
 
 ---
 
-## 🌟 Key Platform Features (v2.3.0)
+## 🌟 Key Platform Features (v2.4.0)
 
 1. **👑 Site Owner & Administrator Portal (`/admin/`)**:
    - **User Management & Lifecycle**: Provision, edit, block, or delete users; change passwords directly; generate 1-time temporary passphrases; force password reset on next login.
    - **Security Policies & Password Rotation**: Enforce password rotation (60/90/180/365 days), password complexity rules, registration governance (Open/Invite/Closed), and brute-force lockout thresholds.
+   - **🏷️ Username Security Governance**: Automatic blocklist for reserved staff titles and system commands/routes, with optional alphanumeric enforcement (letters + numbers).
    - **IP Firewall & Security Threat Alerts**: Manual and automated IP blocklist with threat alert banners for suspicious authentication activity.
    - **Demographics & Analytics Dashboard**: Chart.js telemetry covering beverage categories, ABV distributions, user growth timeline, top styles, and 1-click CSV exports.
    - **System Legacy Importer**: Relocated to admin area for secured historical log importing.
@@ -18,7 +19,7 @@ A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for 
    - **Password Reset (`forgot_password.php`)**: Dispatches secure 1-time temporary passwords without leaking account existence.
    - **Mandatory Password Reset (`change_password.php`)**: Enforces complexity rules for temporary/expired credentials.
 
-2. **Brew Batch & Fermentation Tracker**:
+3. **Brew Batch & Fermentation Tracker**:
    - Stages: **Planning** -> **Primary Fermentation** -> **Secondary / Racking** -> **Bottling / Aging** -> **Completed**.
    - Track Original Gravity (OG), Specific Gravity (SG), Final Gravity (FG), Pitch/Ferment Temps, and calculated ABV (\( (OG - FG) \times 131.25 \)).
    - Interactive **Chart.js** fermentation gravity drop curve over time.

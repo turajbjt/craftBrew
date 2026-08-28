@@ -160,14 +160,15 @@ function run_migrations($db = null) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         $defaultSettings = [
-            'password_rotation_days'    => '0',
-            'password_min_length'       => '8',
-            'password_require_complex'  => '0',
-            'registration_mode'         => 'open',
-            'max_login_attempts'        => '5',
-            'lockout_minutes'           => '15',
-            'max_recovery_attempts'     => '3',
-            'recovery_lockout_minutes'  => '15'
+            'password_rotation_days'        => '0',
+            'password_min_length'           => '8',
+            'password_require_complex'      => '0',
+            'username_require_alphanumeric' => '0',
+            'registration_mode'             => 'open',
+            'max_login_attempts'            => '5',
+            'lockout_minutes'               => '15',
+            'max_recovery_attempts'         => '3',
+            'recovery_lockout_minutes'      => '15'
         ];
         $setStmt = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=setting_key");
         foreach ($defaultSettings as $k => $v) {

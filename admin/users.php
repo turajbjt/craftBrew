@@ -27,13 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $password = $_POST['password'] ?? '';
         $autoPass = !empty($_POST['auto_password']);
 
+        $userValErr = '';
         if (empty($username) || !$email) {
             $error = "Valid username and email are required.";
+        } elseif (!validate_username($username, $userValErr)) {
+            $error = $userValErr;
         } else {
-            $stmt = $db->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-            $stmt->execute([$username, $email]);
+            $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
             if ($stmt->fetch()) {
-                $error = "Username or email is already registered.";
+                $error = "Email address is already registered.";
             } else {
                 if ($autoPass || empty($password)) {
                     $password = bin2hex(random_bytes(6)); // 12 chars
@@ -57,20 +60,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // 2. Edit User
     if ($action === 'edit_user') {
         $targetId = sanitize_int($_POST['user_id'] ?? 0);
+        $username = sanitize_text($_POST['username'] ?? '', 50);
         $email    = filter_var(trim($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
         $role     = validate_enum($_POST['role'] ?? '', ['admin', 'brewer'], 'brewer');
         $status   = validate_enum($_POST['status'] ?? '', ['active', 'suspended', 'banned'], 'active');
         $canDocs  = !empty($_POST['can_manage_docs']) ? 1 : 0;
 
-        if ($targetId <= 0 || !$email) {
-            $error = "Invalid user ID or email address.";
+        $userValErr = '';
+        if ($targetId <= 0 || !$email || empty($username)) {
+            $error = "Invalid user ID, username, or email address.";
+        } elseif (!validate_username($username, $userValErr, $targetId)) {
+            $error = $userValErr;
         } else {
             // Prevent owner from demoting/banning their own account
             if ($targetId === $adminUser['id'] && ($role !== 'admin' || $status !== 'active')) {
                 $error = "You cannot demote or suspend your own active administrator account.";
             } else {
-                $up = $db->prepare("UPDATE users SET email = ?, role = ?, status = ?, can_manage_docs = ? WHERE id = ?");
-                $up->execute([$email, $role, $status, $canDocs, $targetId]);
+                $up = $db->prepare("UPDATE users SET username = ?, email = ?, role = ?, status = ?, can_manage_docs = ? WHERE id = ?");
+                $up->execute([$username, $email, $role, $status, $canDocs, $targetId]);
                 $message = "User details updated successfully!";
             }
         }
@@ -363,6 +370,11 @@ require_once __DIR__ . '/../includes/header.php';
             <input type="hidden" name="user_id" id="editUserId">
 
             <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" id="editUsername" class="form-control" required>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Email Address</label>
                 <input type="email" name="email" id="editEmail" class="form-control" required>
             </div>
@@ -456,6 +468,7 @@ function openAddUserModal() {
 function openEditModal(user) {
     document.getElementById('editUserId').value = user.id;
     document.getElementById('editModalUsername').textContent = user.username;
+    document.getElementById('editUsername').value = user.username;
     document.getElementById('editEmail').value = user.email;
     document.getElementById('editRole').value = user.role;
     document.getElementById('editStatus').value = user.status;

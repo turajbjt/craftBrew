@@ -27,8 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $regMode !== 'closed') {
     $confirm  = $_POST['confirm_password'] ?? '';
 
     $valError = '';
+    $userValError = '';
     if (empty($username) || !$email || empty($password)) {
         $error = "Please provide a valid username, email address, and password.";
+    } elseif (!validate_username($username, $userValError)) {
+        $error = $userValError;
     } elseif ($password !== $confirm) {
         $error = "Passwords do not match.";
     } elseif (!validate_password_strength($password, $valError)) {
@@ -37,10 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $regMode !== 'closed') {
         try {
             $db = get_db();
 
-            $stmt = $db->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-            $stmt->execute([$username, $email]);
+            $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
             if ($stmt->fetch()) {
-                $error = "Username or email is already registered.";
+                $error = "This email address is already registered.";
             } else {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
                 $apiToken = generate_api_token();

@@ -201,6 +201,7 @@ INSERT INTO site_settings (setting_key, setting_value) VALUES
 ('password_rotation_days', '0'),
 ('password_min_length', '8'),
 ('password_require_complex', '0'),
+('username_require_alphanumeric', '0'),
 ('registration_mode', 'open'),
 ('max_login_attempts', '5'),
 ('lockout_minutes', '15'),
