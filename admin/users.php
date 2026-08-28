@@ -51,6 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $token = generate_api_token();
                     $ins = $db->prepare("INSERT INTO users (username, email, password_hash, role, status, can_manage_docs, must_change_password, api_token) VALUES (?, ?, ?, ?, 'active', ?, ?, ?)");
                     $ins->execute([$username, $email, $hash, $role, $canDocs, $autoPass ? 1 : 0, $token]);
+                    $newUserId = (int)$db->lastInsertId();
+                    log_admin_action('create_user', "Created user '{$username}' with role {$role}", 'user', $newUserId);
                     $message = "User '{$username}' created successfully!";
                 }
             }
@@ -78,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } else {
                 $up = $db->prepare("UPDATE users SET username = ?, email = ?, role = ?, status = ?, can_manage_docs = ? WHERE id = ?");
                 $up->execute([$username, $email, $role, $status, $canDocs, $targetId]);
+                log_admin_action('edit_user', "Updated user #{$targetId} ({$username}) to role:{$role}, status:{$status}", 'user', $targetId);
                 $message = "User details updated successfully!";
             }
         }
@@ -98,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $hash = password_hash($newPass, PASSWORD_DEFAULT);
             $up = $db->prepare("UPDATE users SET password_hash = ?, must_change_password = ?, password_changed_at = NOW() WHERE id = ?");
             $up->execute([$hash, $forceNext, $targetId]);
+            log_admin_action('password_reset', "Direct password reset performed for user ID #{$targetId}", 'user', $targetId);
             $message = "Password updated directly for user ID #{$targetId}.";
         }
     }
@@ -119,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             $generatedTempPass = $tempPass;
             $tempPassTargetUser = $targetUsername;
+            log_admin_action('temp_password', "Generated temporary 1-time password for '{$targetUsername}'", 'user', $targetId);
             $message = "Temporary 1-time password generated for user '{$targetUsername}'.";
         }
     }
@@ -128,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $targetId = sanitize_int($_POST['user_id'] ?? 0);
         $up = $db->prepare("UPDATE users SET must_change_password = 1 WHERE id = ?");
         $up->execute([$targetId]);
+        log_admin_action('force_password_reset', "Flagged user ID #{$targetId} for mandatory password reset", 'user', $targetId);
         $message = "User ID #{$targetId} is now flagged to change password upon next login.";
     }
 
@@ -137,8 +143,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($targetId === $adminUser['id']) {
             $error = "You cannot delete your own account.";
         } else {
+            $uStmt = $db->prepare("SELECT username FROM users WHERE id = ?");
+            $uStmt->execute([$targetId]);
+            $deletedUsername = $uStmt->fetchColumn();
+
             $del = $db->prepare("DELETE FROM users WHERE id = ?");
             $del->execute([$targetId]);
+            log_admin_action('delete_user', "Permanently deleted user account '{$deletedUsername}' (ID #{$targetId})", 'user', $targetId);
             $message = "User account and associated records deleted.";
         }
     }

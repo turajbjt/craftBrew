@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $expiresAt = ($durationHours > 0) ? date('Y-m-d H:i:s', time() + ($durationHours * 3600)) : null;
             $ins = $db->prepare("INSERT INTO blocked_ips (ip_address, reason, blocked_by_admin_id, expires_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE reason=VALUES(reason), expires_at=VALUES(expires_at)");
             $ins->execute([$ip, $reason, $adminUser['id'], $expiresAt]);
+
+            log_admin_action('block_ip', "Blocked IP {$ip}. Reason: {$reason}" . ($durationHours ? " ({$durationHours}h)" : " (Permanent)"), 'ip');
             $message = "IP address '{$ip}' has been blocked successfully.";
         }
     }
@@ -35,21 +37,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     // 2. Unblock IP
     if ($action === 'unblock_ip') {
         $blockId = sanitize_int($_POST['block_id'] ?? 0);
+        $stmt = $db->prepare("SELECT ip_address FROM blocked_ips WHERE id = ?");
+        $stmt->execute([$blockId]);
+        $targetIp = $stmt->fetchColumn();
+
         $del = $db->prepare("DELETE FROM blocked_ips WHERE id = ?");
         $del->execute([$blockId]);
+
+        if ($targetIp) {
+            log_admin_action('unblock_ip', "Unblocked IP {$targetIp}", 'ip');
+        }
         $message = "IP address unblocked successfully.";
     }
 
     // 3. Clear Login Attempts
     if ($action === 'clear_login_logs') {
         $db->exec("DELETE FROM login_attempts");
+        log_admin_action('clear_logs', 'Cleared login failure logs');
         $message = "Login attempt audit logs cleared.";
     }
 
     // 4. Clear Recovery Logs
     if ($action === 'clear_recovery_logs') {
         $db->exec("DELETE FROM recovery_attempts");
+        log_admin_action('clear_logs', 'Cleared recovery request logs');
         $message = "Recovery request audit logs cleared.";
+    }
+
+    // 5. Clear Admin Audit Logs
+    if ($action === 'clear_admin_logs') {
+        $db->exec("DELETE FROM admin_audit_logs");
+        log_admin_action('clear_logs', 'Cleared admin activity audit trail');
+        $message = "Admin activity audit trail reset.";
     }
 }
 
@@ -61,6 +80,9 @@ $failedLogins = $db->query("SELECT * FROM login_attempts ORDER BY attempted_at D
 
 // Fetch Recent Recovery Requests (Top 25)
 $recoveryLogs = $db->query("SELECT * FROM recovery_attempts ORDER BY attempted_at DESC LIMIT 25")->fetchAll();
+
+// Fetch Admin Audit Trail (Top 50)
+$adminLogs = $db->query("SELECT a.*, u.username as admin_name FROM admin_audit_logs a LEFT JOIN users u ON a.admin_id = u.id ORDER BY a.created_at DESC LIMIT 50")->fetchAll();
 
 $csrfToken = generate_csrf_token();
 $pageTitle = "Security & IP Firewall - Admin Portal";
@@ -158,7 +180,7 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Security Audit Streams -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
     <!-- Failed Logins Stream -->
     <div class="card" style="padding: 0; overflow-x: auto;">
         <div style="padding: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
@@ -256,6 +278,51 @@ require_once __DIR__ . '/../includes/header.php';
             </tbody>
         </table>
     </div>
+</div>
+
+<!-- Admin Action Audit Trail Table -->
+<div class="card" style="padding: 0; overflow-x: auto;">
+    <div style="padding: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 class="card-title">👑 Administrator Action Audit Trail</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">Live security log tracking administrative changes, password resets, and policy modifications.</p>
+        </div>
+        <?php if (!empty($adminLogs)): ?>
+            <form method="POST" action="security.php" onsubmit="return confirm('Clear admin action audit trail?');" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                <input type="hidden" name="action" value="clear_admin_logs">
+                <button type="submit" class="btn btn-secondary btn-sm">Clear Audit Trail</button>
+            </form>
+        <?php endif; ?>
+    </div>
+    <table class="data-table" style="font-size: 0.85rem;">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Administrator</th>
+                <th>Action</th>
+                <th>Details</th>
+                <th>IP Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($adminLogs)): ?>
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No administrator actions recorded yet.</td>
+                </tr>
+            <?php else: ?>
+                <?php foreach ($adminLogs as $al): ?>
+                    <tr>
+                        <td><?= date('M d, Y H:i:s', strtotime($al['created_at'])) ?></td>
+                        <td><strong><?= e($al['admin_name'] ?: 'System') ?></strong></td>
+                        <td><span class="badge badge-primary"><?= e($al['action']) ?></span></td>
+                        <td><?= e($al['details']) ?></td>
+                        <td><code><?= e($al['ip_address']) ?></code></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

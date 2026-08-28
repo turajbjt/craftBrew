@@ -16,6 +16,17 @@ $totalBatches = (int)$db->query("SELECT COUNT(*) FROM batches")->fetchColumn();
 $totalGallons = (float)$db->query("SELECT SUM(batch_size_gal) FROM batches")->fetchColumn() ?: 0.0;
 $blockedIpCount = (int)$db->query("SELECT COUNT(*) FROM blocked_ips WHERE expires_at IS NULL OR expires_at > NOW()")->fetchColumn();
 
+// Document storage disk usage
+$docUsageBytes = 0;
+$docCount = 0;
+if (is_dir(DOC_UPLOAD_DIR)) {
+    foreach (glob(DOC_UPLOAD_DIR . '*.*') as $file) {
+        $docUsageBytes += @filesize($file);
+        $docCount++;
+    }
+}
+$docUsageMb = round($docUsageBytes / (1024 * 1024), 2);
+
 // 2. Check for Security Alerts (High Failure / Recovery Thresholds)
 $recentFailedLogins = (int)$db->query("SELECT COUNT(*) FROM login_attempts WHERE attempted_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
 $recentRecoveryReqs = (int)$db->query("SELECT COUNT(*) FROM recovery_attempts WHERE attempted_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
@@ -103,7 +114,7 @@ require_once __DIR__ . '/../includes/header.php';
 <!-- System Status & Quick Actions -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
     <div class="card">
-        <h3 class="card-title" style="margin-bottom: 1rem;">⚙️ Platform Security Governance</h3>
+        <h3 class="card-title" style="margin-bottom: 1rem;">⚙️ Platform Security &amp; Infrastructure</h3>
         <table class="data-table" style="font-size: 0.9rem;">
             <tr>
                 <td><strong>Registration Mode</strong></td>
@@ -118,8 +129,16 @@ require_once __DIR__ . '/../includes/header.php';
                 <td><?= (int)get_site_setting('password_min_length', 8) ?> characters</td>
             </tr>
             <tr>
-                <td><strong>Brute-Force Lockout Threshold</strong></td>
+                <td><strong>Brute-Force Lockout</strong></td>
                 <td><?= (int)get_site_setting('max_login_attempts', 5) ?> attempts / <?= (int)get_site_setting('lockout_minutes', 15) ?> mins</td>
+            </tr>
+            <tr>
+                <td><strong>SMTP Mail Relay</strong></td>
+                <td><?= get_site_setting('smtp_enabled', 0) ? '<span class="badge" style="background:#dcfce7; color:#166534;">Authenticated SMTP</span>' : '<span class="badge badge-secondary">Internal PHP mail()</span>' ?></td>
+            </tr>
+            <tr>
+                <td><strong>Document Storage Disk</strong></td>
+                <td><?= $docUsageMb ?> MB (<?= $docCount ?> files, max <?= (int)get_site_setting('max_doc_upload_mb', 25) ?>MB/file)</td>
             </tr>
             <tr>
                 <td><strong>HTTPS Encrypted Mode</strong></td>
@@ -127,7 +146,7 @@ require_once __DIR__ . '/../includes/header.php';
             </tr>
         </table>
         <div style="margin-top: 1rem;">
-            <a href="settings.php" class="btn btn-secondary btn-sm">Edit Security Policies &raquo;</a>
+            <a href="settings.php" class="btn btn-secondary btn-sm">Edit Platform Policies &raquo;</a>
         </div>
     </div>
 
@@ -135,6 +154,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h3 class="card-title" style="margin-bottom: 1rem;">⚡ Quick Admin Actions</h3>
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             <a href="users.php" class="btn btn-primary" style="text-align: left;">👥 Manage Users &amp; Passwords</a>
+            <a href="backup.php" class="btn btn-secondary" style="text-align: left;">💾 Download Full Database Backup (.sql)</a>
             <a href="security.php" class="btn btn-secondary" style="text-align: left;">🛡️ IP Blocklist &amp; Security Logs</a>
             <a href="analytics.php" class="btn btn-secondary" style="text-align: left;">📈 Brewing Demographics &amp; Analytics</a>
             <a href="import.php" class="btn btn-secondary" style="text-align: left;">🚚 Import Legacy Brew Logs &amp; References</a>

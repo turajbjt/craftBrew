@@ -113,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
         $importLogs[] = "Imported {$importedDocs} reference files into Document Library.";
         $isDone = true;
+        log_admin_action('legacy_import', "Executed legacy batch/recipe and reference file import");
     } catch (Exception $e) {
         $error = $e->getMessage();
     }

@@ -62,51 +62,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $description = sanitize_text($_POST['description'] ?? '', 1000);
 
         if (!empty($_FILES['doc_file']['name']) && !empty($title)) {
-            $tmpFile = $_FILES['doc_file']['tmp_name'];
-            $origName = basename($_FILES['doc_file']['name']);
-            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-            $allowedExtensions = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
+            $maxMb = (int)get_site_setting('max_doc_upload_mb', 25);
+            $maxBytes = $maxMb * 1024 * 1024;
 
-            if (in_array($ext, $allowedExtensions)) {
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                $detectedMime = finfo_file($finfo, $tmpFile);
-                finfo_close($finfo);
+            if ($_FILES['doc_file']['size'] > $maxBytes) {
+                $error = "File size exceeds the configured maximum limit of {$maxMb}MB.";
+            } else {
+                $tmpFile = $_FILES['doc_file']['tmp_name'];
+                $origName = basename($_FILES['doc_file']['name']);
+                $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                $allowedExtensions = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
 
-                $allowedMimes = [
-                    'pdf'  => ['application/pdf'],
-                    'txt'  => ['text/plain', 'text/x-c', 'text/x-asm'],
-                    'png'  => ['image/png'],
-                    'jpg'  => ['image/jpeg', 'image/pjpeg'],
-                    'jpeg' => ['image/jpeg', 'image/pjpeg'],
-                    'gif'  => ['image/gif']
-                ];
+                if (in_array($ext, $allowedExtensions)) {
+                    // Verify binary magic-byte MIME type
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $detectedMime = finfo_file($finfo, $tmpFile);
+                    finfo_close($finfo);
 
-                $validMime = isset($allowedMimes[$ext]) && in_array($detectedMime, $allowedMimes[$ext]);
+                    $allowedMimes = [
+                        'pdf'  => ['application/pdf'],
+                        'txt'  => ['text/plain', 'text/x-c', 'text/x-asm'],
+                        'png'  => ['image/png'],
+                        'jpg'  => ['image/jpeg', 'image/pjpeg'],
+                        'jpeg' => ['image/jpeg', 'image/pjpeg'],
+                        'gif'  => ['image/gif']
+                    ];
 
-                if ($validMime) {
-                    if (!is_dir(DOC_UPLOAD_DIR)) {
-                        @mkdir(DOC_UPLOAD_DIR, 0777, true);
-                        @chmod(DOC_UPLOAD_DIR, 0777);
-                    }
-                    $safeDiskFilename = bin2hex(random_bytes(16)) . '.' . $ext;
-                    $targetPath = DOC_UPLOAD_DIR . $safeDiskFilename;
+                    $validMime = isset($allowedMimes[$ext]) && in_array($detectedMime, $allowedMimes[$ext]);
 
-                    if (move_uploaded_file($tmpFile, $targetPath)) {
-                        @chmod($targetPath, 0666);
-                        $fileType = $ext === 'pdf' ? 'PDF Document' : ($ext === 'txt' ? 'Text Note' : 'Image');
-                        $originalFilename = sanitize_text($origName, 255);
+                    if ($validMime) {
+                        if (!is_dir(DOC_UPLOAD_DIR)) {
+                            @mkdir(DOC_UPLOAD_DIR, 0777, true);
+                            @chmod(DOC_UPLOAD_DIR, 0777);
+                        }
+                        $safeDiskFilename = bin2hex(random_bytes(16)) . '.' . $ext;
+                        $targetPath = DOC_UPLOAD_DIR . $safeDiskFilename;
 
-                        $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, original_filename, file_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                        $ins->execute([$user['id'], $title, $category, $safeDiskFilename, $originalFilename, $fileType, $description]);
-                        $message = "Document uploaded securely and verified successfully!";
+                        if (move_uploaded_file($tmpFile, $targetPath)) {
+                            @chmod($targetPath, 0666);
+                            $fileType = $ext === 'pdf' ? 'PDF Document' : ($ext === 'txt' ? 'Text Note' : 'Image');
+                            $originalFilename = sanitize_text($origName, 255);
+
+                            $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, original_filename, file_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                            $ins->execute([$user['id'], $title, $category, $safeDiskFilename, $originalFilename, $fileType, $description]);
+                            $newDocId = (int)$db->lastInsertId();
+                            log_admin_action('upload_document', "Uploaded document '{$title}' ({$fileType})", 'document', $newDocId);
+                            $message = "Document uploaded securely and verified successfully!";
+                        } else {
+                            $error = "Failed to save uploaded file to storage.";
+                        }
                     } else {
-                        $error = "Failed to save uploaded file to storage.";
+                        $error = "File verification failed: Binary content does not match expected {$ext} format ({$detectedMime}).";
                     }
                 } else {
-                    $error = "File verification failed: Binary content does not match expected {$ext} format ({$detectedMime}).";
+                    $error = "Invalid file type. Allowed formats: PDF, TXT, PNG, JPG, GIF.";
                 }
-            } else {
-                $error = "Invalid file type. Allowed formats: PDF, TXT, PNG, JPG, GIF.";
             }
         } else {
             $error = "Please select a valid file and enter a document title.";
@@ -139,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             $del = $db->prepare("DELETE FROM documents WHERE id = ?");
             $del->execute([$docId]);
+            log_admin_action('delete_document', "Deleted document '{$doc['title']}' (ID #{$docId})", 'document', $docId);
 
             if ($fileDeleted) {
                 $message = "Document and physical file permanently deleted!";
@@ -308,6 +319,7 @@ require_once __DIR__ . '/includes/header.php';
             <div class="form-group">
                 <label class="form-label">Select File (.pdf, .txt, .png, .jpg)</label>
                 <input type="file" name="doc_file" class="form-control" accept=".pdf,.txt,.png,.jpg,.jpeg,.gif" required>
+                <small style="color: var(--text-muted);">Maximum file size: <?= (int)get_site_setting('max_doc_upload_mb', 25) ?>MB</small>
             </div>
 
             <div class="form-group">

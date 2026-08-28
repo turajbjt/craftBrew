@@ -3,6 +3,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
 
+require_once __DIR__ . '/includes/EmailService.php';
+
 $pageTitle = "Reset Password - " . APP_NAME;
 $activePage = 'login';
 $message = '';
@@ -37,11 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $updateStmt = $db->prepare("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?");
                 $updateStmt->execute([$newHash, $user['id']]);
 
-                // Dispatch notification email
+                // Dispatch notification email via EmailService
                 $subject = "Your " . APP_NAME . " Temporary Password";
                 $body = "Hello " . $user['username'] . ",\n\nA password reset request was processed for your account.\n\nYour one-time temporary password is: " . $tempPassword . "\n\nYou will be required to choose a new permanent password immediately upon signing in.\n\nLog in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this reset, please notify your administrator immediately.";
-                $headers = "From: no-reply@" . ($_SERVER['SERVER_NAME'] ?? 'localhost') . "\r\n";
-                @mail($user['email'], $subject, $body, $headers);
+                EmailService::send($user['email'], $subject, $body);
             }
         } catch (Exception $e) {}
 

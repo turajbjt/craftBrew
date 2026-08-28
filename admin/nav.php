@@ -17,5 +17,6 @@ $adminSubPage = $adminSubPage ?? 'dashboard';
     <a href="security.php" class="btn btn-sm <?= $adminSubPage === 'security' ? 'btn-primary' : 'btn-secondary' ?>">🛡️ Security &amp; IP Blocklist</a>
     <a href="analytics.php" class="btn btn-sm <?= $adminSubPage === 'analytics' ? 'btn-primary' : 'btn-secondary' ?>">📈 Demographics &amp; Analytics</a>
     <a href="settings.php" class="btn btn-sm <?= $adminSubPage === 'settings' ? 'btn-primary' : 'btn-secondary' ?>">⚙️ Policies &amp; Settings</a>
+    <a href="backup.php" class="btn btn-sm <?= $adminSubPage === 'backup' ? 'btn-primary' : 'btn-secondary' ?>">💾 Database Backup</a>
     <a href="import.php" class="btn btn-sm <?= $adminSubPage === 'import' ? 'btn-primary' : 'btn-secondary' ?>">🚚 Legacy Importer</a>
 </div>

@@ -489,6 +489,24 @@ function validate_enum($val, array $allowed, $default = '') {
     return in_array($val, $allowed, true) ? $val : $default;
 }
 
+function log_admin_action($action, $details = '', $targetType = '', $targetId = null) {
+    try {
+        $admin = current_user();
+        if (!$admin) return;
+        $db = get_db();
+        $ip = get_client_ip();
+        $stmt = $db->prepare("INSERT INTO admin_audit_logs (admin_id, action, target_type, target_id, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([
+            $admin['id'],
+            sanitize_text($action, 100),
+            sanitize_text($targetType, 50),
+            $targetId ? (int)$targetId : null,
+            sanitize_text($details, 2000),
+            $ip
+        ]);
+    } catch (Exception $e) {}
+}
+
 function generate_api_token() {
     return bin2hex(random_bytes(32));
 }
@@ -510,18 +528,42 @@ function authenticate_api_request() {
 
     if (!$token) {
         http_response_code(401);
-        echo json_encode(['error' => 'Missing API token. Use Authorization: Bearer <token>']);
+        echo json_encode([
+            'error'   => 'missing_token',
+            'message' => 'Missing API token. Provide header Authorization: Bearer <token>'
+        ]);
         exit;
     }
 
     $db = get_db();
-    $stmt = $db->prepare("SELECT id, username, email, role, status FROM users WHERE api_token = ?");
+    $stmt = $db->prepare("SELECT id, username, email, role, status, must_change_password FROM users WHERE api_token = ?");
     $stmt->execute([$token]);
     $user = $stmt->fetch();
 
-    if (!$user || !hash_equals($user['api_token'] ?? '', $token) || $user['status'] !== 'active') {
+    if (!$user || !hash_equals($user['api_token'] ?? $token, $token)) {
         http_response_code(401);
-        echo json_encode(['error' => 'Invalid or expired API token']);
+        echo json_encode([
+            'error'   => 'invalid_token',
+            'message' => 'Invalid or expired API token'
+        ]);
+        exit;
+    }
+
+    if ($user['status'] !== 'active') {
+        http_response_code(403);
+        echo json_encode([
+            'error'   => 'account_suspended',
+            'message' => 'Account is suspended or deactivated. Contact administrator.'
+        ]);
+        exit;
+    }
+
+    if (!empty($user['must_change_password'])) {
+        http_response_code(403);
+        echo json_encode([
+            'error'   => 'password_change_required',
+            'message' => 'Your account requires a password reset. Please sign in via web browser to update your password.'
+        ]);
         exit;
     }
 

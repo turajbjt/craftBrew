@@ -8,7 +8,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-define('INSTALL_VERSION', '2.4.0');
+define('INSTALL_VERSION', '2.5.0');
 $lockFile = __DIR__ . '/installed.lock';
 $configFile = __DIR__ . '/config.php';
 $schemaFile = __DIR__ . '/schema.sql';

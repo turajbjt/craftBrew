@@ -3,6 +3,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
 
+require_once __DIR__ . '/includes/EmailService.php';
+
 $pageTitle = "Forgot Username - " . APP_NAME;
 $activePage = 'login';
 $message = '';
@@ -29,11 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
 
             if ($user && $user['status'] === 'active') {
-                // Dispatch notification email
+                // Dispatch notification email via EmailService
                 $subject = "Your " . APP_NAME . " Username";
                 $body = "Hello,\n\nA username reminder was requested for your account.\n\nYour username is: " . $user['username'] . "\n\nYou can log in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this, please ignore this email.";
-                $headers = "From: no-reply@" . ($_SERVER['SERVER_NAME'] ?? 'localhost') . "\r\n";
-                @mail($user['email'], $subject, $body, $headers);
+                EmailService::send($user['email'], $subject, $body);
             }
         } catch (Exception $e) {}
 

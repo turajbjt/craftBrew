@@ -28,6 +28,90 @@ $ingredients = $details['ingredients'];
 $supplies    = $details['supplies'];
 $steps       = $details['steps'];
 
+// Handle Recipe Exports (BeerXML & JSON)
+if (isset($_GET['export'])) {
+    $expType = $_GET['export'];
+    $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $r['name']);
+
+    if ($expType === 'json') {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $cleanName . '_recipe.json"');
+        $exportData = [
+            'generator'       => APP_NAME . ' v' . APP_VERSION,
+            'name'            => $r['name'],
+            'category'        => $r['category_name'],
+            'style'           => $r['style'],
+            'batch_size_gal'  => (float)$r['batch_size_gal'],
+            'target_og'       => $r['target_og'] ? (float)$r['target_og'] : null,
+            'target_fg'       => $r['target_fg'] ? (float)$r['target_fg'] : null,
+            'target_abv'      => $r['target_abv'] ? (float)$r['target_abv'] : null,
+            'ingredients_raw' => $r['ingredients'],
+            'instructions'    => $r['instructions'],
+            'ingredients'     => $ingredients,
+            'supplies'        => $supplies,
+            'steps'           => $steps
+        ];
+        echo json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($expType === 'beerxml') {
+        header('Content-Type: application/xml; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $cleanName . '_recipe.xml"');
+        echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        echo "<RECIPES>\n";
+        echo "  <RECIPE>\n";
+        echo "    <NAME>" . htmlspecialchars($r['name']) . "</NAME>\n";
+        echo "    <VERSION>1</VERSION>\n";
+        echo "    <TYPE>All Grain</TYPE>\n";
+        echo "    <STYLE><NAME>" . htmlspecialchars($r['style'] ?: 'Craft') . "</NAME></STYLE>\n";
+        echo "    <BATCH_SIZE>" . round((float)$r['batch_size_gal'] * 3.78541, 2) . "</BATCH_SIZE>\n"; // Liters
+        if ($r['target_og']) echo "    <OG>" . htmlspecialchars($r['target_og']) . "</OG>\n";
+        if ($r['target_fg']) echo "    <FG>" . htmlspecialchars($r['target_fg']) . "</FG>\n";
+        if ($r['target_abv']) echo "    <EST_ABV>" . htmlspecialchars($r['target_abv']) . "</EST_ABV>\n";
+        echo "    <NOTES>" . htmlspecialchars($r['instructions'] ?? '') . "</NOTES>\n";
+
+        if (!empty($ingredients)) {
+            echo "    <FERMENTABLES>\n";
+            foreach ($ingredients as $ing) {
+                if ($ing['ingredient_type'] === 'Fermentable') {
+                    echo "      <FERMENTABLE>\n";
+                    echo "        <NAME>" . htmlspecialchars($ing['name']) . "</NAME>\n";
+                    echo "        <AMOUNT>" . round((float)$ing['amount'] * 0.453592, 3) . "</AMOUNT>\n"; // kg
+                    echo "      </FERMENTABLE>\n";
+                }
+            }
+            echo "    </FERMENTABLES>\n";
+
+            echo "    <HOPS>\n";
+            foreach ($ingredients as $ing) {
+                if ($ing['ingredient_type'] === 'Hop') {
+                    echo "      <HOP>\n";
+                    echo "        <NAME>" . htmlspecialchars($ing['name']) . "</NAME>\n";
+                    echo "        <AMOUNT>" . round((float)$ing['amount'] * 0.0283495, 4) . "</AMOUNT>\n"; // kg
+                    echo "        <USE>Boil</USE>\n";
+                    echo "      </HOP>\n";
+                }
+            }
+            echo "    </HOPS>\n";
+
+            echo "    <YEASTS>\n";
+            foreach ($ingredients as $ing) {
+                if ($ing['ingredient_type'] === 'Yeast') {
+                    echo "      <YEAST>\n";
+                    echo "        <NAME>" . htmlspecialchars($ing['name']) . "</NAME>\n";
+                    echo "      </YEAST>\n";
+                }
+            }
+            echo "    </YEASTS>\n";
+        }
+
+        echo "  </RECIPE>\n";
+        echo "</RECIPES>\n";
+        exit;
+    }
+}
+
 $pageTitle = e($r['name']) . " - Recipe";
 $activePage = 'recipes';
 require_once __DIR__ . '/includes/header.php';
@@ -42,12 +126,14 @@ require_once __DIR__ . '/includes/header.php';
             &bull; <?= e($r['style'] ?: 'Craft Recipe') ?> &bull; Formulated by <?= e($r['username']) ?>
         </p>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
         <?php if ($r['user_id'] == $user['id']): ?>
-            <a href="recipe_edit.php?action=edit&id=<?= (int)$r['id'] ?>" class="btn btn-secondary">✏️ Edit Recipe</a>
+            <a href="recipe_edit.php?action=edit&id=<?= (int)$r['id'] ?>" class="btn btn-secondary">✏️ Edit</a>
         <?php endif; ?>
-        <a href="batch_edit.php?action=new&recipe_id=<?= (int)$r['id'] ?>" class="btn btn-primary">🍺 Start Batch From Recipe</a>
-        <a href="export_pdf.php?type=recipe&id=<?= (int)$r['id'] ?>" class="btn btn-secondary" target="_blank">📄 Export PDF Sheet</a>
+        <a href="batch_edit.php?action=new&recipe_id=<?= (int)$r['id'] ?>" class="btn btn-primary">🍺 Start Batch</a>
+        <a href="export_pdf.php?type=recipe&id=<?= (int)$r['id'] ?>" class="btn btn-secondary" target="_blank">📄 PDF</a>
+        <a href="recipe_detail.php?id=<?= (int)$r['id'] ?>&export=beerxml" class="btn btn-secondary" title="Export standard BeerXML format">📤 BeerXML</a>
+        <a href="recipe_detail.php?id=<?= (int)$r['id'] ?>&export=json" class="btn btn-secondary" title="Export CraftBrew JSON format">📥 JSON</a>
     </div>
 </div>
 

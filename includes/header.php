@@ -36,7 +36,7 @@ $adminPrefix = $inAdmin ? '' : 'admin/';
 
             <?php if ($user): ?>
                 <li class="nav-user">
-                    <a href="<?= $basePrefix ?>change_password.php" style="color: var(--text-main); text-decoration: none; font-size: 0.9rem;" title="Change Password">👤 <?= htmlspecialchars($user['username']) ?></a>
+                    <a href="<?= $basePrefix ?>profile.php" style="color: var(--text-main); text-decoration: none; font-size: 0.9rem;" title="My Profile & Settings">👤 <?= htmlspecialchars($user['username']) ?></a>
                     <a href="<?= $basePrefix ?>logout.php" class="btn-logout">Logout</a>
                 </li>
             <?php else: ?>

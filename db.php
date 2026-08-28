@@ -153,6 +153,21 @@ function run_migrations($db = null) {
     } catch (Exception $e) {}
 
     try {
+        $db->exec("CREATE TABLE IF NOT EXISTS admin_audit_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            admin_id INT NOT NULL,
+            action VARCHAR(100) NOT NULL,
+            target_type VARCHAR(50) DEFAULT '',
+            target_id INT NULL,
+            details TEXT,
+            ip_address VARCHAR(45) NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_admin_log (admin_id, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $logs[] = "Verified table: admin_audit_logs";
+    } catch (Exception $e) {}
+
+    try {
         $db->exec("CREATE TABLE IF NOT EXISTS site_settings (
             setting_key VARCHAR(50) PRIMARY KEY,
             setting_value TEXT NOT NULL,
@@ -168,7 +183,16 @@ function run_migrations($db = null) {
             'max_login_attempts'            => '5',
             'lockout_minutes'               => '15',
             'max_recovery_attempts'         => '3',
-            'recovery_lockout_minutes'      => '15'
+            'recovery_lockout_minutes'      => '15',
+            'smtp_enabled'                  => '0',
+            'smtp_host'                     => '',
+            'smtp_port'                     => '587',
+            'smtp_encryption'               => 'tls',
+            'smtp_user'                     => '',
+            'smtp_pass'                     => '',
+            'smtp_from_email'               => '',
+            'smtp_from_name'                => 'CraftBrew Platform',
+            'max_doc_upload_mb'             => '25'
         ];
         $setStmt = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=setting_key");
         foreach ($defaultSettings as $k => $v) {

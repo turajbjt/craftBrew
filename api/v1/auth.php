@@ -9,6 +9,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+// 1. IP Blocklist check
+if (is_ip_blocked()) {
+    http_response_code(403);
+    echo json_encode([
+        'error'   => 'ip_blocked',
+        'message' => 'Access blocked from your network.'
+    ]);
+    exit;
+}
+
 $rawInput = file_get_contents('php://input');
 $input = json_decode($rawInput, true) ?: $_POST;
 
@@ -17,16 +27,53 @@ $password = trim($input['password'] ?? '');
 
 if (empty($username) || empty($password)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Username and password are required']);
+    echo json_encode([
+        'error'   => 'missing_fields',
+        'message' => 'Username and password are required'
+    ]);
+    exit;
+}
+
+// 2. Check Brute-force throttling
+$lockoutSeconds = check_brute_force_lockout($username);
+if ($lockoutSeconds > 0) {
+    $lockoutMins = ceil($lockoutSeconds / 60);
+    http_response_code(429);
+    echo json_encode([
+        'error'   => 'rate_limited',
+        'message' => "Too many failed login attempts. Please try again in {$lockoutMins} minute(s)."
+    ]);
     exit;
 }
 
 $db = get_db();
-$stmt = $db->prepare("SELECT id, username, email, password_hash, role, api_token FROM users WHERE username = ? OR email = ?");
+$stmt = $db->prepare("SELECT id, username, email, password_hash, role, status, must_change_password, api_token FROM users WHERE username = ? OR email = ?");
 $stmt->execute([$username, $username]);
 $user = $stmt->fetch();
 
 if ($user && password_verify($password, $user['password_hash'])) {
+    clear_failed_logins($username);
+
+    // Check account status
+    if ($user['status'] !== 'active') {
+        http_response_code(403);
+        echo json_encode([
+            'error'   => 'account_suspended',
+            'message' => 'Your account has been suspended or banned. Please contact the administrator.'
+        ]);
+        exit;
+    }
+
+    // Check mandatory password reset
+    if (!empty($user['must_change_password'])) {
+        http_response_code(403);
+        echo json_encode([
+            'error'   => 'password_change_required',
+            'message' => 'Your account requires an immediate password update. Please sign into the web interface to change your password.'
+        ]);
+        exit;
+    }
+
     if (empty($user['api_token'])) {
         $token = generate_api_token();
         $up = $db->prepare("UPDATE users SET api_token = ? WHERE id = ?");
@@ -35,17 +82,22 @@ if ($user && password_verify($password, $user['password_hash'])) {
     }
 
     echo json_encode([
-        'status' => 'success',
+        'status'  => 'success',
         'message' => 'Authenticated successfully',
         'user' => [
-            'id' => $user['id'],
+            'id'       => $user['id'],
             'username' => $user['username'],
-            'email' => $user['email'],
-            'role' => $user['role']
+            'email'    => $user['email'],
+            'role'     => $user['role'],
+            'status'   => $user['status']
         ],
         'api_token' => $user['api_token']
     ]);
 } else {
+    record_failed_login($username);
     http_response_code(401);
-    echo json_encode(['error' => 'Invalid username or password']);
+    echo json_encode([
+        'error'   => 'invalid_credentials',
+        'message' => 'Invalid username or password'
+    ]);
 }
