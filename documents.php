@@ -55,24 +55,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $description = sanitize_text($_POST['description'] ?? '', 1000);
 
         if (!empty($_FILES['doc_file']['name']) && !empty($title)) {
+            $tmpFile = $_FILES['doc_file']['tmp_name'];
             $origName = basename($_FILES['doc_file']['name']);
             $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-            $allowed = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
+            $allowedExtensions = ['pdf', 'txt', 'png', 'jpg', 'jpeg', 'gif'];
 
-            if (in_array($ext, $allowed)) {
-                if (!is_dir(DOC_UPLOAD_DIR)) {
-                    mkdir(DOC_UPLOAD_DIR, 0755, true);
-                }
-                $safeFilename = time() . '_' . preg_replace('/[^a-zA-Z0-9_\.-]/', '', $origName);
-                $targetPath = DOC_UPLOAD_DIR . $safeFilename;
+            if (in_array($ext, $allowedExtensions)) {
+                // Verify binary magic-byte MIME type
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $detectedMime = finfo_file($finfo, $tmpFile);
+                finfo_close($finfo);
 
-                if (move_uploaded_file($_FILES['doc_file']['tmp_name'], $targetPath)) {
-                    $fileType = $ext === 'pdf' ? 'PDF Document' : ($ext === 'txt' ? 'Text Note' : 'Image');
-                    $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, file_type, description) VALUES (?, ?, ?, ?, ?, ?)");
-                    $ins->execute([$user['id'], $title, $category, $safeFilename, $fileType, $description]);
-                    $message = "Document uploaded successfully!";
+                $allowedMimes = [
+                    'pdf'  => ['application/pdf'],
+                    'txt'  => ['text/plain', 'text/x-c', 'text/x-asm'],
+                    'png'  => ['image/png'],
+                    'jpg'  => ['image/jpeg', 'image/pjpeg'],
+                    'jpeg' => ['image/jpeg', 'image/pjpeg'],
+                    'gif'  => ['image/gif']
+                ];
+
+                $validMime = isset($allowedMimes[$ext]) && in_array($detectedMime, $allowedMimes[$ext]);
+
+                if ($validMime) {
+                    if (!is_dir(DOC_UPLOAD_DIR)) {
+                        @mkdir(DOC_UPLOAD_DIR, 0777, true);
+                        @chmod(DOC_UPLOAD_DIR, 0777);
+                    }
+                    // Generate safe randomized storage filename
+                    $safeDiskFilename = bin2hex(random_bytes(16)) . '.' . $ext;
+                    $targetPath = DOC_UPLOAD_DIR . $safeDiskFilename;
+
+                    if (move_uploaded_file($tmpFile, $targetPath)) {
+                        @chmod($targetPath, 0666);
+                        $fileType = $ext === 'pdf' ? 'PDF Document' : ($ext === 'txt' ? 'Text Note' : 'Image');
+                        $originalFilename = sanitize_text($origName, 255);
+
+                        $ins = $db->prepare("INSERT INTO documents (user_id, title, category, filename, original_filename, file_type, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $ins->execute([$user['id'], $title, $category, $safeDiskFilename, $originalFilename, $fileType, $description]);
+                        $message = "Document uploaded securely and verified successfully!";
+                    } else {
+                        $error = "Failed to save uploaded file to storage.";
+                    }
                 } else {
-                    $error = "Failed to save uploaded file to disk.";
+                    $error = "File verification failed: Binary content does not match expected {$ext} format ({$detectedMime}).";
                 }
             } else {
                 $error = "Invalid file type. Allowed formats: PDF, TXT, PNG, JPG, GIF.";
@@ -221,7 +247,7 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
                 <h3 class="card-title"><?= e($d['title']) ?></h3>
                 <p class="card-subtitle"><?= e($d['description'] ?: 'Reference file') ?></p>
-                <p><small style="color: var(--text-muted);">Filename: <code><?= e($d['filename']) ?></code></small></p>
+                <p><small style="color: var(--text-muted);">File: <code><?= e($d['original_filename'] ?: $d['filename']) ?></code></small></p>
 
                 <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
                     <a href="documents.php?action=view&id=<?= (int)$d['id'] ?>" class="btn btn-primary btn-sm" target="_blank">📖 View File</a>

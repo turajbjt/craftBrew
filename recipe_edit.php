@@ -52,11 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $catId        = sanitize_int($_POST['category_id'] ?? 1);
     $name         = sanitize_text($_POST['name'] ?? '', 100);
     $style        = sanitize_text($_POST['style'] ?? '', 100);
-    $batchSize    = sanitize_float($_POST['batch_size_gal'] ?? 5.0);
-    $targetOg     = !empty($_POST['target_og']) ? sanitize_float($_POST['target_og']) : null;
-    $targetFg     = !empty($_POST['target_fg']) ? sanitize_float($_POST['target_fg']) : null;
+    $batchSize    = validate_batch_size($_POST['batch_size_gal'] ?? 5.0, 5.0);
+    $targetOg     = validate_gravity($_POST['target_og'] ?? null);
+    $targetFg     = validate_gravity($_POST['target_fg'] ?? null);
     $instructions = sanitize_text($_POST['instructions'] ?? '', 5000);
     $isPublic     = isset($_POST['is_public']) ? 1 : 0;
+
+    $allowedIngTypes = ['Fermentable', 'Hop', 'Yeast', 'Additive', 'Fining', 'Water', 'Other'];
+    $allowedStages   = ['Mash', 'Boil', 'Primary', 'Secondary', 'Tertiary', 'Bottling', 'Kegging', 'Aging'];
 
     // Process POSTed ingredients array
     $postIngredients = [];
@@ -66,10 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($ingNameClean)) {
                 $postIngredients[] = [
                     'name'            => $ingNameClean,
-                    'ingredient_type' => sanitize_text($_POST['ing_type'][$idx] ?? 'Fermentable', 50),
-                    'amount'          => sanitize_float($_POST['ing_amount'][$idx] ?? 0),
+                    'ingredient_type' => validate_enum($_POST['ing_type'][$idx] ?? '', $allowedIngTypes, 'Other'),
+                    'amount'          => max(0.0, sanitize_float($_POST['ing_amount'][$idx] ?? 0)),
                     'unit'            => sanitize_text($_POST['ing_unit'][$idx] ?? '', 20),
-                    'stage_addition'  => sanitize_text($_POST['ing_stage'][$idx] ?? 'Primary', 50),
+                    'stage_addition'  => validate_enum($_POST['ing_stage'][$idx] ?? '', $allowedStages, 'Primary'),
                     'notes'           => sanitize_text($_POST['ing_notes'][$idx] ?? '', 500)
                 ];
             }

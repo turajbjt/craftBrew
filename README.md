@@ -44,9 +44,60 @@ A multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for homebrew
 
 ---
 
-## 🚀 Quick Start & Deployment
+## 🚀 Installation & Deployment
 
-### Docker Deployment (Recommended)
+CraftBrew can be installed directly on **Bare-Metal LAMP servers** (like OpenCart or WordPress) or deployed via **Docker Compose**.
+
+---
+
+### Option 1: Bare-Metal LAMP Server Installation (Recommended)
+
+#### Prerequisites:
+- **Web Server**: Apache 2.4+ (or Nginx) with PHP 8.0+
+- **Database**: MariaDB 10.3+ or MySQL 8.0+
+- **PHP Extensions**: `pdo`, `pdo_mysql`, `mbstring` (e.g. `sudo apt install php php-mysql php-mbstring`)
+
+#### A. Fresh Installation (Web Setup Wizard)
+1. **Copy Files**: Extract or clone the project files directly into your web root or subfolder:
+   ```bash
+   cd /var/www/html/
+   git clone https://github.com/turajbjt/brewSite.git brewsite
+   cd brewsite
+   ```
+
+2. **Set Storage Permissions**:
+   ```bash
+   chmod -R 775 assets/docs/
+   # Or run the included helper:
+   chmod +x install.sh && ./install.sh
+   ```
+
+3. **Run Web Setup Wizard**:
+   - Open your browser to `http://<your-server-ip>/brewsite/install.php`
+   - Enter your **Database Host, Database Name, User, and Password**.
+   - Set up your initial **Admin Username, Email, and Password**.
+   - Click **Install CraftBrew Platform**. The wizard will automatically create the database, import tables, seed starter categories/recipes, and configure `config.php`!
+
+---
+
+#### B. Upgrading an Existing Installation
+When upgrading from an earlier version:
+1. **Copy New Files**: Extract/copy the updated files over your existing installation directory.
+   *(Your `config.php`, user accounts, recipes, batches, and uploaded documents in `assets/docs/` are 100% preserved).*
+
+2. **Run One-Click Web Upgrader**:
+   - Open `http://<your-server-ip>/brewsite/install.php?mode=upgrade` in your browser.
+   - Click **⚡ Apply Database Upgrades & Complete**.
+   
+3. **Alternative CLI Upgrade**:
+   - From your server terminal, simply run:
+     ```bash
+     ./install.sh --upgrade
+     ```
+
+---
+
+### Option 2: Docker Compose Deployment
 
 1. Clone or navigate to the project directory:
    ```bash

@@ -1,0 +1,19 @@
+# ==============================================================================
+# Disable all script execution in uploads/documents directory
+# ==============================================================================
+
+# Disable PHP engine if available
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# Deny direct execution of executable script extensions
+<FilesMatch "(?i)\.(php|phtml|php3|php4|php5|php7|php8|phps|phar|inc|cgi|pl|py|sh|bash|exe|asp|aspx|js)$">
+    Require all denied
+</FilesMatch>
+
+# Serve all other files as plain static downloads/views
+Options -Indexes -ExecCGI

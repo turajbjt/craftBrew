@@ -1,18 +1,22 @@
-version: '3.8'
-
 services:
   web:
     image: recurringmgt-web:latest
     container_name: craftbrew_web
+    command: >
+      bash -c "a2enmod rewrite headers ssl socache_shmcb 2>/dev/null || true;
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/ssl/private/ssl-cert-snakeoil.key -out /etc/ssl/certs/ssl-cert-snakeoil.pem -subj '/C=US/ST=BrewState/L=BrewCity/O=CraftBrew/OU=IT/CN=localhost' 2>/dev/null || true;
+      a2ensite default-ssl 2>/dev/null || true;
+      apache2-foreground"
     ports:
       - "8080:80"
+      - "8443:443"
     environment:
       - DB_HOST=db
       - DB_PORT=3306
       - DB_NAME=craftbrew
       - DB_USER=brewuser
       - DB_PASS=brewpassword
-      - APP_URL=http://localhost:8080
+      - APP_URL=https://localhost:8443
     volumes:
       - .:/var/www/html
     depends_on:

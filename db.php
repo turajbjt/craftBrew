@@ -30,7 +30,14 @@ function get_db() {
                 $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
                 $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
             } catch (Exception $e2) {
-                die("Database Connection Error: " . $e->getMessage());
+                // If not installed and in web context, redirect to installer
+                if (!file_exists(__DIR__ . '/installed.lock') && php_sapi_name() !== 'cli') {
+                    if (basename($_SERVER['PHP_SELF'] ?? '') !== 'install.php') {
+                        header('Location: install.php');
+                        exit;
+                    }
+                }
+                die("Database Connection Error: " . $e->getMessage() . "<br><br>If this is a new installation, please run <a href='install.php'>install.php</a> to configure the system.");
             }
         }
     }
@@ -38,22 +45,89 @@ function get_db() {
 }
 
 /**
- * Execute schema setup from schema.sql
+ * Execute schema setup and migrations
  */
 function init_schema() {
-    $db = get_db();
+    return run_migrations();
+}
+
+/**
+ * Run safe non-destructive migrations for new tables, columns, and categories.
+ * Returns an array of log messages describing applied changes.
+ */
+function run_migrations($db = null) {
+    if ($db === null) {
+        $db = get_db();
+    }
+    $logs = [];
+
+    // 1. Run schema.sql base CREATE TABLE IF NOT EXISTS
     $schemaFile = __DIR__ . '/schema.sql';
     if (file_exists($schemaFile)) {
         $sql = file_get_contents($schemaFile);
         $db->exec($sql);
+        $logs[] = "Base schema tables verified.";
     }
-    // Ensure date_rack_2 and date_rack_3 columns exist
+
+    // 2. Incremental column migrations on batches table
     try {
         $db->exec("ALTER TABLE batches ADD COLUMN date_rack_2 DATE NULL AFTER date_rack");
+        $logs[] = "Verified column: batches.date_rack_2";
     } catch (Exception $e) {}
+
     try {
         $db->exec("ALTER TABLE batches ADD COLUMN date_rack_3 DATE NULL AFTER date_rack_2");
+        $logs[] = "Verified column: batches.date_rack_3";
     } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE batches ADD COLUMN gravity_sg DECIMAL(4,3) DEFAULT NULL AFTER gravity_og");
+        $logs[] = "Verified column: batches.gravity_sg";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE batches ADD COLUMN gravity_tertiary DECIMAL(4,3) DEFAULT NULL AFTER gravity_sg");
+        $logs[] = "Verified column: batches.gravity_tertiary";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE documents ADD COLUMN original_filename VARCHAR(255) DEFAULT '' AFTER filename");
+        $logs[] = "Verified column: documents.original_filename";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip_address VARCHAR(45) NOT NULL,
+            username VARCHAR(50) NOT NULL,
+            attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ip_user (ip_address, username, attempted_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $logs[] = "Verified table: login_attempts";
+    } catch (Exception $e) {}
+
+    // 3. Ensure standard categories exist
+    $defaultCategories = [
+        'Beer'       => 'Malt and hop based fermented beverages',
+        'Wine'       => 'Grape and fruit based wines',
+        'Cider'      => 'Apple and fruit cider brews',
+        'Mead'       => 'Honey based fermented drinks',
+        'Fruit Wine' => 'Specialty fruit & berry wines'
+    ];
+    $catStmt = $db->prepare("INSERT INTO categories (name, description) VALUES (?, ?) ON DUPLICATE KEY UPDATE description=VALUES(description)");
+    foreach ($defaultCategories as $name => $desc) {
+        $catStmt->execute([$name, $desc]);
+    }
+    $logs[] = "Default categories verified.";
+
+    // 4. Ensure upload directory exists with write permissions
+    if (!is_dir(DOC_UPLOAD_DIR)) {
+        @mkdir(DOC_UPLOAD_DIR, 0777, true);
+        @chmod(DOC_UPLOAD_DIR, 0777);
+        $logs[] = "Document storage directory created at assets/docs/";
+    }
+
+    return $logs;
 }
 
 /**

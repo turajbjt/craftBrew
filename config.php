@@ -16,12 +16,24 @@ define('DB_USER', getenv('DB_USER') ?: 'brewuser');
 define('DB_PASS', getenv('DB_PASS') ?: 'brewpassword');
 define('DB_CHARSET', 'utf8mb4');
 
+// Detect HTTPS
+$isHttps = (
+    (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] === 'on' || $_SERVER['HTTPS'] == 1)) ||
+    (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+    (isset($_SERVER['SERVER_PORT']) && in_array((int)$_SERVER['SERVER_PORT'], [443, 8443]))
+);
+define('IS_HTTPS', $isHttps);
+
+// Session Inactivity Timeout (60 Minutes)
+define('SESSION_TIMEOUT_SECONDS', 3600);
+
 // Secure Session Cookie Settings
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
+    ini_set('session.use_strict_mode', 1);
     ini_set('session.cookie_samesite', 'Lax');
-    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+    if (IS_HTTPS) {
         ini_set('session.cookie_secure', 1);
     }
     session_start();
@@ -31,7 +43,7 @@ if (session_status() === PHP_SESSION_NONE) {
 define('DOC_UPLOAD_DIR', __DIR__ . '/assets/docs/');
 define('MAX_UPLOAD_SIZE', 25 * 1024 * 1024); // 25 MB
 
-// Error reporting settings
+// Error reporting settings (Strict suppression in production)
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Hide errors from public output for security
+ini_set('display_errors', 0); // Hide all errors from public output
 ini_set('log_errors', 1);

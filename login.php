@@ -18,7 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = sanitize_text($_POST['username'] ?? '', 100);
     $password = $_POST['password'] ?? '';
 
-    if (empty($username) || empty($password)) {
+    // Check brute-force login throttle
+    $lockoutSeconds = check_login_throttle($username);
+    if ($lockoutSeconds > 0) {
+        $mins = ceil($lockoutSeconds / 60);
+        $error = "Too many failed login attempts. Account temporarily locked for security. Please try again in {$mins} minute(s).";
+    } elseif (empty($username) || empty($password)) {
         $error = "Please enter both username and password.";
     } else {
         try {
@@ -28,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user = $stmt->fetch();
 
             if ($user && password_verify($password, $user['password_hash'])) {
+                // Clear any recorded failed attempts
+                clear_failed_login_attempts($username);
+
                 // Regenerate session ID to prevent Session Fixation
                 session_regenerate_id(true);
 
@@ -43,11 +51,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['email'] = $user['email'];
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['api_token'] = $user['api_token'];
+                $_SESSION['last_activity'] = time();
 
                 header('Location: index.php');
                 exit;
             } else {
-                $error = "Invalid username/email or password.";
+                record_failed_login_attempt($username);
+                $remaining = check_login_throttle($username);
+                if ($remaining > 0) {
+                    $error = "Too many failed login attempts. Account locked for 15 minutes.";
+                } else {
+                    $error = "Invalid username/email or password.";
+                }
             }
         } catch (Exception $e) {
             $error = "An authentication error occurred. Please try again.";
@@ -69,6 +84,12 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($_GET['msg']) && $_GET['msg'] === 'session_timeout'): ?>
+            <div style="background: #fef3c7; color: #92400e; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                Your session timed out due to 60 minutes of inactivity. Please log in again.
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($error)): ?>
             <div style="background: #ffe4e6; color: #9f1239; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
                 <?= e($error) ?>
@@ -80,7 +101,7 @@ require_once __DIR__ . '/includes/header.php';
             
             <div class="form-group">
                 <label class="form-label" for="username">Username or Email</label>
-                <input type="text" id="username" name="username" class="form-control" required placeholder="brewer">
+                <input type="text" id="username" name="username" class="form-control" required placeholder="brewer" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>">
             </div>
 
             <div class="form-group">

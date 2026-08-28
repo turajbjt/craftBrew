@@ -6,3 +6,10 @@ data/*.db
 
 # Environment override
 .env
+
+# Runtime install lock and local certificates
+installed.lock
+*.key
+*.pem
+*.crt
+*.csr

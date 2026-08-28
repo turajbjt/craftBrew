@@ -76,24 +76,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $batchName   = sanitize_text($_POST['batch_name'] ?? '', 100);
     $batchType   = sanitize_text($_POST['batch_type'] ?? '', 50);
     $batchStyle  = sanitize_text($_POST['batch_style'] ?? '', 100);
-    $batchSize   = sanitize_float($_POST['batch_size_gal'] ?? 5.0);
-    $dateStart   = sanitize_text($_POST['date_start'] ?? '', 10);
-    $dateRack    = sanitize_text($_POST['date_rack'] ?? '', 10);
-    $dateRack2   = sanitize_text($_POST['date_rack_2'] ?? '', 10);
-    $dateRack3   = sanitize_text($_POST['date_rack_3'] ?? '', 10);
-    $dateBottle  = sanitize_text($_POST['date_bottle'] ?? '', 10);
-    $pitchTemp   = sanitize_text($_POST['pitch_temp_f'] ?? '', 10);
-    $fermentTemp = sanitize_text($_POST['ferment_temp_f'] ?? '', 10);
-    $og          = !empty($_POST['gravity_og']) ? sanitize_float($_POST['gravity_og']) : null;
-    $sg          = !empty($_POST['gravity_sg']) ? sanitize_float($_POST['gravity_sg']) : null;
-    $fg          = !empty($_POST['gravity_fg']) ? sanitize_float($_POST['gravity_fg']) : null;
+    $batchSize   = validate_batch_size($_POST['batch_size_gal'] ?? 5.0, 5.0);
+    $dateStart   = validate_date($_POST['date_start'] ?? null);
+    $dateRack    = validate_date($_POST['date_rack'] ?? null);
+    $dateRack2   = validate_date($_POST['date_rack_2'] ?? null);
+    $dateRack3   = validate_date($_POST['date_rack_3'] ?? null);
+    $dateBottle  = validate_date($_POST['date_bottle'] ?? null);
+    $pitchTemp   = validate_temp($_POST['pitch_temp_f'] ?? '');
+    $fermentTemp = validate_temp($_POST['ferment_temp_f'] ?? '');
+    $og          = validate_gravity($_POST['gravity_og'] ?? null);
+    $sg          = validate_gravity($_POST['gravity_sg'] ?? null);
+    $fg          = validate_gravity($_POST['gravity_fg'] ?? null);
     $ingredients = sanitize_text($_POST['ingredients'] ?? '', 5000);
     $boilNotes   = sanitize_text($_POST['boil_notes'] ?? '', 5000);
     $reflections = sanitize_text($_POST['reflections'] ?? '', 5000);
-    $rating      = min(10, max(0, sanitize_int($_POST['rating'] ?? 0)));
+    $rating      = validate_rating($_POST['rating'] ?? 0);
     
     $allowedStatuses = ['Planning', 'Primary', 'Secondary', 'Bottling/Aging', 'Completed'];
-    $status      = in_array($_POST['status'] ?? '', $allowedStatuses) ? $_POST['status'] : 'Primary';
+    $status      = validate_enum($_POST['status'] ?? '', $allowedStatuses, 'Primary');
 
     if (empty($batchName)) {
         $error = "Batch Name is required.";
