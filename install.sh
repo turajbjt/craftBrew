@@ -18,7 +18,7 @@ cd "$SCRIPT_DIR"
 
 echo -e "${BLUE}======================================================${NC}"
 echo -e "${BLUE}   🍺 CraftBrew Platform Bare-Metal Setup & Upgrade   ${NC}"
-echo -e "${BLUE}                   Version 2.5.0                      ${NC}"
+echo -e "${BLUE}                   Version 2.7.0                      ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
 # Check for PHP CLI

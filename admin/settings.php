@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $minLen           = max(6, min(32, sanitize_int($_POST['password_min_length'] ?? 8)));
         $requireComplex   = !empty($_POST['password_require_complex']) ? '1' : '0';
         $requireAlphaNum  = !empty($_POST['username_require_alphanumeric']) ? '1' : '0';
+        $enforceAdmin2fa  = !empty($_POST['enforce_admin_2fa']) ? '1' : '0';
         $regMode          = validate_enum($_POST['registration_mode'] ?? '', ['open', 'invite', 'closed'], 'open');
         $maxLogin         = max(3, min(20, sanitize_int($_POST['max_login_attempts'] ?? 5)));
         $lockoutMins      = max(5, min(1440, sanitize_int($_POST['lockout_minutes'] ?? 15)));
@@ -46,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         set_site_setting('password_min_length', (string)$minLen);
         set_site_setting('password_require_complex', $requireComplex);
         set_site_setting('username_require_alphanumeric', $requireAlphaNum);
+        set_site_setting('enforce_admin_2fa', $enforceAdmin2fa);
         set_site_setting('registration_mode', $regMode);
         set_site_setting('max_login_attempts', (string)$maxLogin);
         set_site_setting('lockout_minutes', (string)$lockoutMins);
@@ -64,8 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         set_site_setting('smtp_from_name', $smtpFromName);
         set_site_setting('max_doc_upload_mb', (string)$maxDocUploadMb);
 
-        log_admin_action('update_settings', "Updated platform security, mailer, and storage policies");
-        $message = "Security policies, SMTP mailer, and storage settings saved successfully!";
+        log_admin_action('update_settings', "Updated platform security, 2FA, mailer, and storage policies");
+        $message = "Security policies, 2FA rules, SMTP mailer, and storage settings saved successfully!";
     }
 
     // 2. Send Test Diagnostic Email
@@ -94,6 +96,7 @@ $currentRotation         = (int)get_site_setting('password_rotation_days', 0);
 $currentMinLen           = (int)get_site_setting('password_min_length', 8);
 $currentComplex          = (bool)get_site_setting('password_require_complex', 0);
 $currentRequireAlphaNum  = (bool)get_site_setting('username_require_alphanumeric', 0);
+$currentEnforceAdmin2fa  = (bool)get_site_setting('enforce_admin_2fa', 0);
 $currentRegMode          = get_site_setting('registration_mode', 'open');
 $currentMaxLogin         = (int)get_site_setting('max_login_attempts', 5);
 $currentLockout          = (int)get_site_setting('lockout_minutes', 15);
@@ -149,6 +152,18 @@ require_once __DIR__ . '/../includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
             <input type="hidden" name="action" value="save_settings">
 
+            <!-- Two-Factor Authentication Policy -->
+            <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
+                <label class="form-label" style="font-size: 0.95rem; font-weight: 700;">🔐 Two-Factor Authentication (2FA)</label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem;">
+                    <input type="checkbox" name="enforce_admin_2fa" value="1" <?= $currentEnforceAdmin2fa ? 'checked' : '' ?>>
+                    <span>Require 2FA for all Administrator accounts</span>
+                </label>
+                <small style="color: var(--text-muted); display: block; margin-top: 0.35rem;">
+                    Users can configure their TOTP authenticator app directly in their <a href="../profile.php" style="color: var(--primary-color);">Profile</a>.
+                </small>
+            </div>
+
             <!-- Password Rotation Policy -->
             <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
                 <label class="form-label" style="font-size: 0.95rem; font-weight: 700;">🔄 Password Rotation Policy</label>
@@ -197,7 +212,7 @@ require_once __DIR__ . '/../includes/header.php';
 
             <!-- Brute-Force & Recovery Throttling -->
             <div class="form-group" style="border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
-                <label class="form-label" style="font-size: 0.95rem; font-weight: 700;">🛡️ Lockout Thresholds</label>
+                <label class="form-label" style="font-size: 0.95rem; font-weight: 700;">🛡️ Lockout Thresholds &amp; Bot Defense</label>
                 
                 <div class="form-row" style="margin-bottom: 0.5rem;">
                     <div class="form-group" style="flex: 1;">
@@ -219,6 +234,10 @@ require_once __DIR__ . '/../includes/header.php';
                         <label class="form-label" style="font-size: 0.8rem;">Recovery Lock (Mins)</label>
                         <input type="number" name="recovery_lockout_minutes" class="form-control" min="5" max="1440" value="<?= $currentRecLockout ?>">
                     </div>
+                </div>
+
+                <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 0.6rem; margin-top: 0.75rem; font-size: 0.8rem; color: #166534;">
+                    ✓ <strong>Invisible Bot Trap:</strong> Zero-dependency Honeypot &amp; Sub-second Time-Trap active across all entry forms.
                 </div>
             </div>
 
@@ -256,6 +275,7 @@ require_once __DIR__ . '/../includes/header.php';
             <input type="hidden" name="action" value="save_settings">
 
             <!-- Hidden policy fields to preserve on submit -->
+            <input type="hidden" name="enforce_admin_2fa" value="<?= $currentEnforceAdmin2fa ? '1' : '0' ?>">
             <input type="hidden" name="password_rotation_days" value="<?= $currentRotation ?>">
             <input type="hidden" name="password_min_length" value="<?= $currentMinLen ?>">
             <input type="hidden" name="password_require_complex" value="<?= $currentComplex ? '1' : '0' ?>">

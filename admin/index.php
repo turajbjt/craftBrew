@@ -137,6 +137,10 @@ require_once __DIR__ . '/../includes/header.php';
                 <td><?= get_site_setting('smtp_enabled', 0) ? '<span class="badge" style="background:#dcfce7; color:#166534;">Authenticated SMTP</span>' : '<span class="badge badge-secondary">Internal PHP mail()</span>' ?></td>
             </tr>
             <tr>
+                <td><strong>Admin 2FA Requirement</strong></td>
+                <td><?= get_site_setting('enforce_admin_2fa', 0) ? '<span class="badge" style="background:#dcfce7; color:#166534;">Enforced</span>' : '<span class="badge badge-secondary">Optional</span>' ?></td>
+            </tr>
+            <tr>
                 <td><strong>Document Storage Disk</strong></td>
                 <td><?= $docUsageMb ?> MB (<?= $docCount ?> files, max <?= (int)get_site_setting('max_doc_upload_mb', 25) ?>MB/file)</td>
             </tr>

@@ -108,6 +108,52 @@ function require_csrf_token() {
 }
 
 /**
+ * Zero-Dependency Invisible Honeypot & Time-Trap Bot Defense
+ */
+function render_bot_trap() {
+    $ts = time();
+    $token = hash_hmac('sha256', (string)$ts, $_SESSION['csrf_token'] ?? 'cb_trap_seed');
+    return '<div style="display:none !important; visibility:hidden !important; opacity:0 !important; position:absolute !important; left:-9999px !important;" aria-hidden="true">' .
+           '<label for="website_url_hp">Leave this field blank</label>' .
+           '<input type="text" id="website_url_hp" name="website_url_hp" tabindex="-1" autocomplete="off" value="">' .
+           '</div>' .
+           '<input type="hidden" name="bot_ts" value="' . $ts . '">' .
+           '<input type="hidden" name="bot_token" value="' . $token . '">';
+}
+
+function verify_bot_trap(&$errorMsg = '') {
+    // 1. Honeypot check: Bots autofill hidden inputs
+    if (!empty($_POST['website_url_hp'])) {
+        $errorMsg = "Automated request blocked.";
+        return false;
+    }
+
+    // 2. Time-Trap check: Reject instant sub-second submissions (< 1s) or ancient expired submissions (> 24h)
+    if (isset($_POST['bot_ts']) && isset($_POST['bot_token'])) {
+        $ts = (int)$_POST['bot_ts'];
+        $token = $_POST['bot_token'];
+        $expectedToken = hash_hmac('sha256', (string)$ts, $_SESSION['csrf_token'] ?? 'cb_trap_seed');
+
+        if (!hash_equals($expectedToken, $token)) {
+            $errorMsg = "Invalid form submission signature. Please reload and try again.";
+            return false;
+        }
+
+        $elapsed = time() - $ts;
+        if ($elapsed < 1) {
+            $errorMsg = "Submission was processed too quickly. Please take a moment and try again.";
+            return false;
+        }
+        if ($elapsed > 86400) {
+            $errorMsg = "This form session has expired. Please refresh the page.";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Brute-Force Login Rate Limiting
  */
 function check_login_throttle($username) {
@@ -354,7 +400,7 @@ function validate_username($username, &$errorMsg = '', $ignoreUserId = null) {
     $lower = strtolower($username);
     $reserved = get_reserved_usernames();
     if (in_array($lower, $reserved, true)) {
-        $errorMsg = "The username '{$username}' is reserved by the system and cannot be used.";
+        $errorMsg = "The chosen username is unavailable. Please choose a different username.";
         return false;
     }
 
@@ -380,7 +426,7 @@ function validate_username($username, &$errorMsg = '', $ignoreUserId = null) {
             $stmt->execute([$lower]);
         }
         if ($stmt->fetch()) {
-            $errorMsg = "This username is already taken. Please choose another.";
+            $errorMsg = "The chosen username is unavailable. Please choose a different username.";
             return false;
         }
     } catch (Exception $e) {}

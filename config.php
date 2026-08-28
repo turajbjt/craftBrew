@@ -6,7 +6,7 @@
 
 // Application Info
 define('APP_NAME', 'CraftBrew Log & Recipe Manager');
-define('APP_VERSION', '2.5.0');
+define('APP_VERSION', '2.7.0');
 
 // MariaDB / MySQL Configuration
 define('DB_HOST', getenv('DB_HOST') ?: '127.0.0.1');
@@ -23,6 +23,18 @@ $isHttps = (
     (isset($_SERVER['SERVER_PORT']) && in_array((int)$_SERVER['SERVER_PORT'], [443, 8443]))
 );
 define('IS_HTTPS', $isHttps);
+
+// Global HTTP Security Headers (Clickjacking, MIME Sniffing, HSTS)
+if (!headers_sent()) {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    header('X-XSS-Protection: 1; mode=block');
+    if (IS_HTTPS) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
 
 // Session Inactivity Timeout (60 Minutes)
 define('SESSION_TIMEOUT_SECONDS', 3600);

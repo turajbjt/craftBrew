@@ -117,6 +117,21 @@ function run_migrations($db = null) {
     } catch (Exception $e) {}
 
     try {
+        $db->exec("ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(64) NULL AFTER api_token");
+        $logs[] = "Verified column: users.two_factor_secret";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN two_factor_enabled TINYINT(1) DEFAULT 0 AFTER two_factor_secret");
+        $logs[] = "Verified column: users.two_factor_enabled";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE users ADD COLUMN two_factor_backup_codes TEXT NULL AFTER two_factor_enabled");
+        $logs[] = "Verified column: users.two_factor_backup_codes";
+    } catch (Exception $e) {}
+
+    try {
         $db->exec("CREATE TABLE IF NOT EXISTS login_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip_address VARCHAR(45) NOT NULL,
@@ -192,7 +207,8 @@ function run_migrations($db = null) {
             'smtp_pass'                     => '',
             'smtp_from_email'               => '',
             'smtp_from_name'                => 'CraftBrew Platform',
-            'max_doc_upload_mb'             => '25'
+            'max_doc_upload_mb'             => '25',
+            'enforce_admin_2fa'             => '0'
         ];
         $setStmt = $db->prepare("INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_key=setting_key");
         foreach ($defaultSettings as $k => $v) {
@@ -215,11 +231,17 @@ function run_migrations($db = null) {
     }
     $logs[] = "Default categories verified.";
 
-    // 4. Ensure upload directory exists with write permissions
+    // 4. Ensure upload directory exists with write permissions & script lockdown
     if (!is_dir(DOC_UPLOAD_DIR)) {
         @mkdir(DOC_UPLOAD_DIR, 0777, true);
         @chmod(DOC_UPLOAD_DIR, 0777);
         $logs[] = "Document storage directory created at assets/docs/";
+    }
+    $storageHtaccess = rtrim(DOC_UPLOAD_DIR, '/\\') . '/.htaccess';
+    if (!file_exists($storageHtaccess)) {
+        $secContent = "# Disable script execution in storage\n<IfModule mod_php.c>\nphp_flag engine off\n</IfModule>\nSetHandler default-handler\n<FilesMatch \"\.(php|phtml|php3|php4|php5|php7|php8|phps|pl|py|cgi|sh|bash|exe|asp|aspx|jsp|shtml)$\">\nOrder Allow,Deny\nDeny from all\n</FilesMatch>\nOptions -Indexes -ExecCGI\n";
+        @file_put_contents($storageHtaccess, $secContent);
+        $logs[] = "Storage security lock (.htaccess) placed in assets/docs/";
     }
 
     return $logs;

@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     must_change_password TINYINT(1) DEFAULT 0,
     password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     api_token VARCHAR(64) UNIQUE NULL,
+    two_factor_secret VARCHAR(64) NULL,
+    two_factor_enabled TINYINT(1) DEFAULT 0,
+    two_factor_backup_codes TEXT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -228,5 +231,6 @@ INSERT INTO site_settings (setting_key, setting_value) VALUES
 ('smtp_pass', ''),
 ('smtp_from_email', ''),
 ('smtp_from_name', 'CraftBrew Platform'),
-('max_doc_upload_mb', '25')
+('max_doc_upload_mb', '25'),
+('enforce_admin_2fa', '0')
 ON DUPLICATE KEY UPDATE setting_key=setting_key;

@@ -2,7 +2,6 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
-
 require_once __DIR__ . '/includes/EmailService.php';
 
 $pageTitle = "Forgot Username - " . APP_NAME;
@@ -12,34 +11,40 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf_token();
-    $email = sanitize_text($_POST['email'] ?? '', 100);
+    $botErr = '';
 
-    // Rate limiting check (e.g. max 3 requests per 15 minutes)
-    $lockout = check_recovery_throttle('username', $email);
-    if ($lockout > 0) {
-        $mins = ceil($lockout / 60);
-        $error = "Too many recovery attempts from your network. Please try again in {$mins} minute(s).";
-    } elseif (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Please enter a valid email address.";
+    if (!verify_bot_trap($botErr)) {
+        $error = $botErr;
     } else {
-        record_recovery_attempt('username', $email);
+        $email = sanitize_text($_POST['email'] ?? '', 100);
 
-        try {
-            $db = get_db();
-            $stmt = $db->prepare("SELECT id, username, email, status FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
+        // Rate limiting check (e.g. max 3 requests per 15 minutes)
+        $lockout = check_recovery_throttle('username', $email);
+        if ($lockout > 0) {
+            $mins = ceil($lockout / 60);
+            $error = "Too many recovery attempts from your network. Please try again in {$mins} minute(s).";
+        } elseif (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = "Please enter a valid email address.";
+        } else {
+            record_recovery_attempt('username', $email);
 
-            if ($user && $user['status'] === 'active') {
-                // Dispatch notification email via EmailService
-                $subject = "Your " . APP_NAME . " Username";
-                $body = "Hello,\n\nA username reminder was requested for your account.\n\nYour username is: " . $user['username'] . "\n\nYou can log in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this, please ignore this email.";
-                EmailService::send($user['email'], $subject, $body);
-            }
-        } catch (Exception $e) {}
+            try {
+                $db = get_db();
+                $stmt = $db->prepare("SELECT id, username, email, status FROM users WHERE email = ?");
+                $stmt->execute([$email]);
+                $user = $stmt->fetch();
 
-        // Anti-enumeration: Generic response ALWAYS returned
-        $message = "If an account is associated with that email address, an email containing your username has been sent. Please check your inbox and spam folder.";
+                if ($user && $user['status'] === 'active') {
+                    // Dispatch notification email via EmailService
+                    $subject = "Your " . APP_NAME . " Username";
+                    $body = "Hello,\n\nA username reminder was requested for your account.\n\nYour username is: " . $user['username'] . "\n\nYou can log in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this, please ignore this email.";
+                    EmailService::send($user['email'], $subject, $body);
+                }
+            } catch (Exception $e) {}
+
+            // Anti-enumeration: Generic response ALWAYS returned
+            $message = "If an account is associated with that email address, an email containing your username has been sent. Please check your inbox and spam folder.";
+        }
     }
 }
 
@@ -71,6 +76,7 @@ require_once __DIR__ . '/includes/header.php';
 
             <form method="POST" action="forgot_username.php">
                 <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                <?= render_bot_trap() ?>
                 
                 <div class="form-group">
                     <label class="form-label" for="email">Account Email Address</label>

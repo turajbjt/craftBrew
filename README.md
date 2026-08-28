@@ -1,14 +1,15 @@
-# CraftBrew - Home & Craft Brewing Platform (v2.5.0)
+# CraftBrew - Home & Craft Brewing Platform (v2.7.0)
 
 A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for craft brewers to formulate recipes, track fermentation logs, record hydrometer readings, manage cellar inventory, analyze brewing demographics, and access reference documentation.
 
 ---
 
-## 🌟 Key Platform Features (v2.5.0)
+## 🌟 Key Platform Features (v2.7.0)
 
 1. **👑 Site Owner & Administrator Portal (`/admin/`)**:
    - **User Management & Lifecycle**: Provision, edit, block, or delete users; change passwords directly; generate 1-time temporary passphrases; force password reset on next login.
    - **Security Policies & Password Rotation**: Enforce password rotation (60/90/180/365 days), password complexity rules, registration governance (Open/Invite/Closed), and brute-force lockout thresholds.
+   - **🔐 Two-Factor Authentication (2FA) Governance**: Admin policy to enforce 2FA for all administrator accounts.
    - **🏷️ Username Security Governance**: Automatic blocklist for reserved staff titles and system commands/routes, with optional alphanumeric enforcement (letters + numbers).
    - **✉️ Authenticated SMTP Mailer**: Native socket SMTP transport with STARTTLS, SSL, and AUTH LOGIN support plus live socket diagnostic testing.
    - **💾 1-Click Database SQL Backup Tool (`admin/backup.php`)**: Download complete database schema & data snapshots instantly.
@@ -17,16 +18,22 @@ A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for 
    - **Demographics & Analytics Dashboard**: Chart.js telemetry covering beverage categories, ABV distributions, user growth timeline, top styles, and 1-click CSV exports.
    - **System Legacy Importer**: Relocated to admin area for secured historical log importing.
 
-2. **👤 User Profile & Account Management (`profile.php`)**:
+2. **🔐 Two-Factor Authentication (2FA / TOTP) & Bot Defense**:
+   - **RFC 6238 TOTP**: Standard authenticator app integration (Google Authenticator, Microsoft Authenticator, 1Password, Authy, Bitwarden).
+   - **Emergency Backup Recovery Codes**: 8 single-use codes generated upon enrollment to prevent lockout.
+   - **🤖 Zero-Dependency Bot Defense**: Invisible Honeypot and sub-second Time-Trap active across all public forms (`login.php`, `register.php`, `forgot_username.php`, `forgot_password.php`).
+
+3. **👤 User Profile & Account Management (`profile.php`)**:
    - Update registered email with password confirmation.
+   - 2FA enrollment, QR code scanner, backup code regeneration, and 2FA disabling.
    - View, copy, or regenerate personal companion Android app REST API tokens.
    - Direct password changes and user statistics.
 
-3. **📥 BeerXML & JSON Recipe Portability**:
+4. **📥 BeerXML & JSON Recipe Portability**:
    - 1-click export of recipes in standard **BeerXML (.xml)** and **CraftBrew JSON (.json)** format.
    - Universal recipe importer supporting BeerXML (hops, fermentables, yeasts) and JSON formulations.
 
-4. **🔑 Self-Service Account Recovery**:
+5. **🔑 Self-Service Account Recovery**:
    - **Username Recovery (`forgot_username.php`)**: Anti-enumeration zero-information design with rate-limiting.
    - **Password Reset (`forgot_password.php`)**: Dispatches secure 1-time temporary passwords without leaking account existence.
    - **Mandatory Password Reset (`change_password.php`)**: Enforces complexity rules for temporary/expired credentials.

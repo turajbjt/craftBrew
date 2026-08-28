@@ -2,7 +2,6 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
-
 require_once __DIR__ . '/includes/EmailService.php';
 
 $pageTitle = "Reset Password - " . APP_NAME;
@@ -12,42 +11,48 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf_token();
-    $username = sanitize_text($_POST['username'] ?? '', 100);
-    $email    = sanitize_text($_POST['email'] ?? '', 100);
+    $botErr = '';
 
-    // Rate limiting check
-    $lockout = check_recovery_throttle('password', $username . '|' . $email);
-    if ($lockout > 0) {
-        $mins = ceil($lockout / 60);
-        $error = "Too many password reset requests from your network. Please try again in {$mins} minute(s).";
-    } elseif (empty($username) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Please provide both your account username and registered email address.";
+    if (!verify_bot_trap($botErr)) {
+        $error = $botErr;
     } else {
-        record_recovery_attempt('password', $username . '|' . $email);
+        $username = sanitize_text($_POST['username'] ?? '', 100);
+        $email    = sanitize_text($_POST['email'] ?? '', 100);
 
-        try {
-            $db = get_db();
-            $stmt = $db->prepare("SELECT id, username, email, status FROM users WHERE username = ? AND email = ?");
-            $stmt->execute([$username, $email]);
-            $user = $stmt->fetch();
+        // Rate limiting check
+        $lockout = check_recovery_throttle('password', $username . '|' . $email);
+        if ($lockout > 0) {
+            $mins = ceil($lockout / 60);
+            $error = "Too many password reset requests from your network. Please try again in {$mins} minute(s).";
+        } elseif (empty($username) || empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = "Please provide both your account username and registered email address.";
+        } else {
+            record_recovery_attempt('password', $username . '|' . $email);
 
-            if ($user && $user['status'] === 'active') {
-                // Generate a cryptographically secure 1-time temporary password (12 characters)
-                $tempPassword = bin2hex(random_bytes(6));
-                $newHash = password_hash($tempPassword, PASSWORD_DEFAULT);
+            try {
+                $db = get_db();
+                $stmt = $db->prepare("SELECT id, username, email, status FROM users WHERE username = ? AND email = ?");
+                $stmt->execute([$username, $email]);
+                $user = $stmt->fetch();
 
-                $updateStmt = $db->prepare("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?");
-                $updateStmt->execute([$newHash, $user['id']]);
+                if ($user && $user['status'] === 'active') {
+                    // Generate a cryptographically secure 1-time temporary password (12 characters)
+                    $tempPassword = bin2hex(random_bytes(6));
+                    $newHash = password_hash($tempPassword, PASSWORD_DEFAULT);
 
-                // Dispatch notification email via EmailService
-                $subject = "Your " . APP_NAME . " Temporary Password";
-                $body = "Hello " . $user['username'] . ",\n\nA password reset request was processed for your account.\n\nYour one-time temporary password is: " . $tempPassword . "\n\nYou will be required to choose a new permanent password immediately upon signing in.\n\nLog in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this reset, please notify your administrator immediately.";
-                EmailService::send($user['email'], $subject, $body);
-            }
-        } catch (Exception $e) {}
+                    $updateStmt = $db->prepare("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?");
+                    $updateStmt->execute([$newHash, $user['id']]);
 
-        // Anti-enumeration: Generic response ALWAYS returned
-        $message = "If the username and email match our records, an email with a secure one-time temporary password has been dispatched. Please check your inbox and spam folder.";
+                    // Dispatch notification email via EmailService
+                    $subject = "Your " . APP_NAME . " Temporary Password";
+                    $body = "Hello " . $user['username'] . ",\n\nA password reset request was processed for your account.\n\nYour one-time temporary password is: " . $tempPassword . "\n\nYou will be required to choose a new permanent password immediately upon signing in.\n\nLog in here: " . (defined('APP_URL') ? APP_URL : '') . "/login.php\n\nIf you did not request this reset, please notify your administrator immediately.";
+                    EmailService::send($user['email'], $subject, $body);
+                }
+            } catch (Exception $e) {}
+
+            // Anti-enumeration: Generic response ALWAYS returned
+            $message = "If the username and email match our records, an email with a secure one-time temporary password has been dispatched. Please check your inbox and spam folder.";
+        }
     }
 }
 
@@ -79,6 +84,7 @@ require_once __DIR__ . '/includes/header.php';
 
             <form method="POST" action="forgot_password.php">
                 <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+                <?= render_bot_trap() ?>
                 
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
