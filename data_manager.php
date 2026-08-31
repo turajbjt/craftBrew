@@ -503,6 +503,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $error = "Import payload exceeds safety boundaries (Max " . MAX_IMPORT_RECIPES . " recipes, " . MAX_IMPORT_BATCHES . " batches).";
                 } else {
                     try {
+                        // Ensure all latest columns & tables exist before importing
+                        init_schema();
+
                         $db->beginTransaction();
 
                         // If REPLACE mode, clear existing user records

@@ -61,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $error = "One or both selected users could not be found in the database.";
         } else {
             try {
+                init_schema();
                 $db->beginTransaction();
 
                 $stats = [

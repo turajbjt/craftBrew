@@ -52,6 +52,29 @@ function init_schema() {
 }
 
 /**
+ * Safe column verification and migration helper.
+ */
+function ensure_table_column($db, $table, $column, $definition, $afterColumn = null) {
+    try {
+        $stmt = $db->query("SHOW COLUMNS FROM `{$table}` LIKE " . $db->quote($column));
+        $exists = $stmt && $stmt->fetch();
+        if (!$exists) {
+            $afterSql = $afterColumn ? " AFTER `{$afterColumn}`" : "";
+            try {
+                $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}{$afterSql}");
+            } catch (Throwable $t) {
+                // If AFTER clause failed, append to table end
+                $db->exec("ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}");
+            }
+            return "Added column: {$table}.{$column}";
+        }
+        return "Verified column: {$table}.{$column}";
+    } catch (Throwable $e) {
+        return "Warning on {$table}.{$column}: " . $e->getMessage();
+    }
+}
+
+/**
  * Run safe non-destructive migrations for new tables, columns, and categories.
  * Returns an array of log messages describing applied changes.
  */
@@ -61,111 +84,167 @@ function run_migrations($db = null) {
     }
     $logs = [];
 
-    // 1. Run schema.sql base CREATE TABLE IF NOT EXISTS
-    $schemaFile = __DIR__ . '/schema.sql';
-    if (file_exists($schemaFile)) {
-        $sql = file_get_contents($schemaFile);
-        $db->exec($sql);
-        $logs[] = "Base schema tables verified.";
-    }
+    // 1. Base table creation individually (safe from multi-query limitations)
+    $tables = [
+        "CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) NOT NULL UNIQUE,
+            email VARCHAR(100) NOT NULL UNIQUE,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(20) NOT NULL DEFAULT 'brewer',
+            status ENUM('active', 'suspended', 'banned') NOT NULL DEFAULT 'active',
+            can_manage_docs TINYINT(1) DEFAULT 0,
+            must_change_password TINYINT(1) DEFAULT 0,
+            password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            api_token VARCHAR(64) UNIQUE NULL,
+            two_factor_secret VARCHAR(64) NULL,
+            two_factor_enabled TINYINT(1) DEFAULT 0,
+            two_factor_backup_codes TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    // 2. Incremental column migrations on batches table
-    try {
-        $db->exec("ALTER TABLE batches ADD COLUMN date_rack_2 DATE NULL AFTER date_rack");
-        $logs[] = "Verified column: batches.date_rack_2";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(50) NOT NULL UNIQUE,
+            description TEXT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE batches ADD COLUMN date_rack_3 DATE NULL AFTER date_rack_2");
-        $logs[] = "Verified column: batches.date_rack_3";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS recipes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            category_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            style VARCHAR(100) DEFAULT '',
+            batch_size_gal DECIMAL(6,2) DEFAULT 5.00,
+            target_pre_og DECIMAL(4,3) DEFAULT NULL,
+            target_og DECIMAL(4,3) DEFAULT NULL,
+            target_fg DECIMAL(4,3) DEFAULT NULL,
+            target_abv DECIMAL(4,2) DEFAULT NULL,
+            ingredients TEXT,
+            instructions TEXT,
+            is_public TINYINT(1) DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE batches ADD COLUMN gravity_sg DECIMAL(4,3) DEFAULT NULL AFTER gravity_og");
-        $logs[] = "Verified column: batches.gravity_sg";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS recipe_ingredients (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            recipe_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            ingredient_type ENUM('Fermentable', 'Hop', 'Yeast', 'Additive', 'Fining', 'Water', 'Other') DEFAULT 'Fermentable',
+            amount DECIMAL(8,3) NOT NULL DEFAULT 0.000,
+            unit VARCHAR(20) DEFAULT 'lbs',
+            stage_addition VARCHAR(50) DEFAULT 'Primary',
+            notes VARCHAR(255) DEFAULT '',
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE batches ADD COLUMN gravity_pre_og DECIMAL(4,3) DEFAULT NULL AFTER ferment_temp_f");
-        $logs[] = "Verified column: batches.gravity_pre_og";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS recipe_supplies (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            recipe_id INT NOT NULL,
+            item_name VARCHAR(100) NOT NULL,
+            category VARCHAR(50) DEFAULT 'Equipment',
+            quantity VARCHAR(50) DEFAULT '1 unit',
+            is_required TINYINT(1) DEFAULT 1,
+            notes VARCHAR(255) DEFAULT '',
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE recipes ADD COLUMN target_pre_og DECIMAL(4,3) DEFAULT NULL AFTER batch_size_gal");
-        $logs[] = "Verified column: recipes.target_pre_og";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS recipe_steps (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            recipe_id INT NOT NULL,
+            step_number INT NOT NULL,
+            step_name VARCHAR(100) NOT NULL,
+            target_temp_f VARCHAR(10) DEFAULT '',
+            duration_minutes INT DEFAULT 0,
+            description TEXT,
+            sort_order INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE batches ADD COLUMN gravity_tertiary DECIMAL(4,3) DEFAULT NULL AFTER gravity_sg");
-        $logs[] = "Verified column: batches.gravity_tertiary";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS batches (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            recipe_id INT DEFAULT NULL,
+            category_id INT NOT NULL,
+            batch_name VARCHAR(100) NOT NULL,
+            batch_type VARCHAR(50) DEFAULT '',
+            batch_style VARCHAR(100) DEFAULT '',
+            batch_size_gal DECIMAL(6,2) DEFAULT 5.00,
+            date_start DATE DEFAULT NULL,
+            date_rack DATE DEFAULT NULL,
+            date_rack_2 DATE DEFAULT NULL,
+            date_rack_3 DATE DEFAULT NULL,
+            date_bottle DATE DEFAULT NULL,
+            pitch_temp_f VARCHAR(10) DEFAULT '',
+            ferment_temp_f VARCHAR(10) DEFAULT '',
+            gravity_pre_og DECIMAL(4,3) DEFAULT NULL,
+            gravity_og DECIMAL(4,3) DEFAULT NULL,
+            gravity_sg DECIMAL(4,3) DEFAULT NULL,
+            gravity_tertiary DECIMAL(4,3) DEFAULT NULL,
+            gravity_fg DECIMAL(4,3) DEFAULT NULL,
+            calculated_abv DECIMAL(4,2) DEFAULT NULL,
+            ingredients TEXT,
+            boil_notes TEXT,
+            reflections TEXT,
+            rating INT DEFAULT 0,
+            status VARCHAR(30) DEFAULT 'Primary',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE documents ADD COLUMN original_filename VARCHAR(255) DEFAULT '' AFTER filename");
-        $logs[] = "Verified column: documents.original_filename";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS fermentation_readings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            batch_id INT NOT NULL,
+            reading_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            gravity DECIMAL(4,3) NOT NULL,
+            temp_f VARCHAR(10) DEFAULT '',
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    // Users table RBAC and security columns
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN status ENUM('active', 'suspended', 'banned') NOT NULL DEFAULT 'active' AFTER role");
-        $logs[] = "Verified column: users.status";
-    } catch (Exception $e) {}
+        "CREATE TABLE IF NOT EXISTS documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            category VARCHAR(50) DEFAULT 'General',
+            filename VARCHAR(255) NOT NULL,
+            original_filename VARCHAR(255) DEFAULT '',
+            file_type VARCHAR(50) NOT NULL,
+            description TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN can_manage_docs TINYINT(1) DEFAULT 0 AFTER status");
-        $logs[] = "Verified column: users.can_manage_docs";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) DEFAULT 0 AFTER can_manage_docs");
-        $logs[] = "Verified column: users.must_change_password";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER must_change_password");
-        $logs[] = "Verified column: users.password_changed_at";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(64) NULL AFTER api_token");
-        $logs[] = "Verified column: users.two_factor_secret";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN two_factor_enabled TINYINT(1) DEFAULT 0 AFTER two_factor_secret");
-        $logs[] = "Verified column: users.two_factor_enabled";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN two_factor_backup_codes TEXT NULL AFTER two_factor_enabled");
-        $logs[] = "Verified column: users.two_factor_backup_codes";
-    } catch (Exception $e) {}
-
-    try {
-        $db->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+        "CREATE TABLE IF NOT EXISTS login_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip_address VARCHAR(45) NOT NULL,
             username VARCHAR(50) NOT NULL,
             attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_ip_user (ip_address, username, attempted_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $logs[] = "Verified table: login_attempts";
-    } catch (Exception $e) {}
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("CREATE TABLE IF NOT EXISTS recovery_attempts (
+        "CREATE TABLE IF NOT EXISTS recovery_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip_address VARCHAR(45) NOT NULL,
             request_type VARCHAR(20) NOT NULL,
             identifier VARCHAR(100) NOT NULL,
             attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_recovery (ip_address, request_type, attempted_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $logs[] = "Verified table: recovery_attempts";
-    } catch (Exception $e) {}
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("CREATE TABLE IF NOT EXISTS blocked_ips (
+        "CREATE TABLE IF NOT EXISTS blocked_ips (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip_address VARCHAR(45) NOT NULL UNIQUE,
             reason VARCHAR(255) DEFAULT '',
@@ -173,12 +252,9 @@ function run_migrations($db = null) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             expires_at DATETIME NULL,
             INDEX idx_blocked_ip (ip_address)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $logs[] = "Verified table: blocked_ips";
-    } catch (Exception $e) {}
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
-    try {
-        $db->exec("CREATE TABLE IF NOT EXISTS admin_audit_logs (
+        "CREATE TABLE IF NOT EXISTS admin_audit_logs (
             id INT AUTO_INCREMENT PRIMARY KEY,
             admin_id INT NOT NULL,
             action VARCHAR(100) NOT NULL,
@@ -188,9 +264,49 @@ function run_migrations($db = null) {
             ip_address VARCHAR(45) NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_admin_log (admin_id, created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $logs[] = "Verified table: admin_audit_logs";
-    } catch (Exception $e) {}
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
+        "CREATE TABLE IF NOT EXISTS site_settings (
+            setting_key VARCHAR(50) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    ];
+
+    foreach ($tables as $tblSql) {
+        try {
+            $db->exec($tblSql);
+        } catch (Throwable $e) {}
+    }
+    $logs[] = "Base schema tables verified.";
+
+    // 2. Incremental column migrations for existing databases
+    $colMigrations = [
+        ['recipes', 'target_pre_og', 'DECIMAL(4,3) DEFAULT NULL', 'batch_size_gal'],
+        ['recipes', 'target_og', 'DECIMAL(4,3) DEFAULT NULL', 'target_pre_og'],
+        ['recipes', 'target_fg', 'DECIMAL(4,3) DEFAULT NULL', 'target_og'],
+        ['recipes', 'target_abv', 'DECIMAL(4,2) DEFAULT NULL', 'target_fg'],
+        ['batches', 'date_rack_2', 'DATE NULL', 'date_rack'],
+        ['batches', 'date_rack_3', 'DATE NULL', 'date_rack_2'],
+        ['batches', 'gravity_pre_og', 'DECIMAL(4,3) DEFAULT NULL', 'ferment_temp_f'],
+        ['batches', 'gravity_sg', 'DECIMAL(4,3) DEFAULT NULL', 'gravity_og'],
+        ['batches', 'gravity_tertiary', 'DECIMAL(4,3) DEFAULT NULL', 'gravity_sg'],
+        ['documents', 'original_filename', 'VARCHAR(255) DEFAULT \'\'', 'filename'],
+        ['users', 'status', 'ENUM(\'active\', \'suspended\', \'banned\') NOT NULL DEFAULT \'active\'', 'role'],
+        ['users', 'can_manage_docs', 'TINYINT(1) DEFAULT 0', 'status'],
+        ['users', 'must_change_password', 'TINYINT(1) DEFAULT 0', 'can_manage_docs'],
+        ['users', 'password_changed_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP', 'must_change_password'],
+        ['users', 'two_factor_secret', 'VARCHAR(64) NULL', 'api_token'],
+        ['users', 'two_factor_enabled', 'TINYINT(1) DEFAULT 0', 'two_factor_secret'],
+        ['users', 'two_factor_backup_codes', 'TEXT NULL', 'two_factor_enabled']
+    ];
+
+    foreach ($colMigrations as $cm) {
+        $res = ensure_table_column($db, $cm[0], $cm[1], $cm[2], $cm[3]);
+        if ($res) {
+            $logs[] = $res;
+        }
+    }
 
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS site_settings (
