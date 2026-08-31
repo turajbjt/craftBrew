@@ -83,11 +83,12 @@ CREATE TABLE IF NOT EXISTS recipe_supplies (
 CREATE TABLE IF NOT EXISTS recipe_steps (
     id INT AUTO_INCREMENT PRIMARY KEY,
     recipe_id INT NOT NULL,
-    step_number INT NOT NULL,
-    step_name VARCHAR(100) NOT NULL,
-    target_temp_f VARCHAR(10) DEFAULT '',
-    duration_minutes INT DEFAULT 0,
-    description TEXT,
+    step_number INT NOT NULL DEFAULT 1,
+    phase VARCHAR(50) DEFAULT 'Brew Day',
+    title VARCHAR(150) DEFAULT '',
+    duration VARCHAR(50) DEFAULT '',
+    target_temp VARCHAR(30) DEFAULT '',
+    instructions TEXT,
     sort_order INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE

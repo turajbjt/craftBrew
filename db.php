@@ -159,11 +159,12 @@ function run_migrations($db = null) {
         "CREATE TABLE IF NOT EXISTS recipe_steps (
             id INT AUTO_INCREMENT PRIMARY KEY,
             recipe_id INT NOT NULL,
-            step_number INT NOT NULL,
-            step_name VARCHAR(100) NOT NULL,
-            target_temp_f VARCHAR(10) DEFAULT '',
-            duration_minutes INT DEFAULT 0,
-            description TEXT,
+            step_number INT NOT NULL DEFAULT 1,
+            phase VARCHAR(50) DEFAULT 'Brew Day',
+            title VARCHAR(150) DEFAULT '',
+            duration VARCHAR(50) DEFAULT '',
+            target_temp VARCHAR(30) DEFAULT '',
+            instructions TEXT,
             sort_order INT DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
@@ -227,6 +228,19 @@ function run_migrations($db = null) {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
 
+        "CREATE TABLE IF NOT EXISTS inventory (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            item_name VARCHAR(100) NOT NULL,
+            category VARCHAR(50) NOT NULL DEFAULT 'Fermentable',
+            quantity DECIMAL(8,2) DEFAULT 0.00,
+            unit VARCHAR(20) DEFAULT '',
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+
         "CREATE TABLE IF NOT EXISTS login_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip_address VARCHAR(45) NOT NULL,
@@ -286,12 +300,21 @@ function run_migrations($db = null) {
         ['recipes', 'target_og', 'DECIMAL(4,3) DEFAULT NULL', 'target_pre_og'],
         ['recipes', 'target_fg', 'DECIMAL(4,3) DEFAULT NULL', 'target_og'],
         ['recipes', 'target_abv', 'DECIMAL(4,2) DEFAULT NULL', 'target_fg'],
+        ['recipe_steps', 'phase', 'VARCHAR(50) DEFAULT \'Brew Day\'', 'step_number'],
+        ['recipe_steps', 'title', 'VARCHAR(150) DEFAULT \'\'', 'phase'],
+        ['recipe_steps', 'duration', 'VARCHAR(50) DEFAULT \'\'', 'title'],
+        ['recipe_steps', 'target_temp', 'VARCHAR(30) DEFAULT \'\'', 'duration'],
+        ['recipe_steps', 'instructions', 'TEXT', 'target_temp'],
         ['batches', 'date_rack_2', 'DATE NULL', 'date_rack'],
         ['batches', 'date_rack_3', 'DATE NULL', 'date_rack_2'],
         ['batches', 'gravity_pre_og', 'DECIMAL(4,3) DEFAULT NULL', 'ferment_temp_f'],
         ['batches', 'gravity_sg', 'DECIMAL(4,3) DEFAULT NULL', 'gravity_og'],
         ['batches', 'gravity_tertiary', 'DECIMAL(4,3) DEFAULT NULL', 'gravity_sg'],
         ['documents', 'original_filename', 'VARCHAR(255) DEFAULT \'\'', 'filename'],
+        ['inventory', 'category', 'VARCHAR(50) NOT NULL DEFAULT \'Fermentable\'', 'item_name'],
+        ['inventory', 'quantity', 'DECIMAL(8,2) DEFAULT 0.00', 'category'],
+        ['inventory', 'unit', 'VARCHAR(20) DEFAULT \'\'', 'quantity'],
+        ['inventory', 'notes', 'TEXT', 'unit'],
         ['users', 'status', 'ENUM(\'active\', \'suspended\', \'banned\') NOT NULL DEFAULT \'active\'', 'role'],
         ['users', 'can_manage_docs', 'TINYINT(1) DEFAULT 0', 'status'],
         ['users', 'must_change_password', 'TINYINT(1) DEFAULT 0', 'can_manage_docs'],
@@ -307,6 +330,20 @@ function run_migrations($db = null) {
             $logs[] = $res;
         }
     }
+
+    // Backfill legacy column data if present
+    try {
+        $db->exec("UPDATE recipe_steps SET title = step_name WHERE (title IS NULL OR title = '') AND step_name IS NOT NULL");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("UPDATE recipe_steps SET instructions = description WHERE (instructions IS NULL OR instructions = '') AND description IS NOT NULL");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("UPDATE recipe_steps SET duration = CONCAT(duration_minutes, ' mins') WHERE (duration IS NULL OR duration = '') AND duration_minutes > 0");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("UPDATE recipe_steps SET target_temp = target_temp_f WHERE (target_temp IS NULL OR target_temp = '') AND target_temp_f IS NOT NULL AND target_temp_f != ''");
+    } catch (Throwable $e) {}
 
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS site_settings (
