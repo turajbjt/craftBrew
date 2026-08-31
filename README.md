@@ -208,7 +208,16 @@ When upgrading from an earlier version:
 │   └── js/app.js               # Dynamic calculator & Chart.js graph renderer
 ├── legacy_import/              # Historical PDFs, text logs, and images imported into MariaDB
 ├── api/
-│   └── v1/                     # REST API endpoints for companion Android app
+│   └── v1/                     # REST API v1 Suite & OpenAPI 3.0 Explorer
+│       ├── index.php           # API Gateway & Route Dispatcher
+│       ├── auth.php            # User authentication, 2FA & profile inspection
+│       ├── batches.php         # Batches & Brew Logs CRUD
+│       ├── recipes.php         # Recipe formulations CRUD & structured steps
+│       ├── readings.php        # Fermentation gravity readings & IoT telemetry (Tilt/iSpindel/Rapt)
+│       ├── inventory.php       # Cellar stock & inventory CRUD
+│       ├── bjcp.php            # BJCP style guidelines & starter templates
+│       ├── calculators.php     # Brewing calculations (ABV, Scaling, Temp, Sugar)
+│       └── docs.php            # Interactive API Explorer & OpenAPI 3.0 JSON spec
 └── includes/
     ├── header.php              # Responsive navigation header
     ├── footer.php              # Page footer
