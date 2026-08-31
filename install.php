@@ -10,7 +10,7 @@ $lockFile = __DIR__ . '/installed.lock';
 $isInstalled = file_exists($lockFile);
 ini_set('display_errors', $isInstalled ? 0 : 1);
 
-define('INSTALL_VERSION', '2.7.0');
+define('INSTALL_VERSION', '2.8.0');
 $configFile = __DIR__ . '/config.php';
 $schemaFile = __DIR__ . '/schema.sql';
 $docsDir = __DIR__ . '/assets/docs/';
@@ -191,12 +191,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 . "define('DB_USER', getenv('DB_USER') ?: " . var_export($dbUser, true) . ");\n"
                 . "define('DB_PASS', getenv('DB_PASS') ?: " . var_export($dbPass, true) . ");\n"
                 . "define('DB_CHARSET', 'utf8mb4');\n\n"
+                . "// Detect HTTPS\n"
+                . "\$isHttps = (\n"
+                . "    (isset(\$_SERVER['HTTPS']) && (\$_SERVER['HTTPS'] === 'on' || \$_SERVER['HTTPS'] == 1)) ||\n"
+                . "    (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && \$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||\n"
+                . "    (isset(\$_SERVER['SERVER_PORT']) && in_array((int)\$_SERVER['SERVER_PORT'], [443, 8443]))\n"
+                . ");\n"
+                . "define('IS_HTTPS', \$isHttps);\n\n"
+                . "// Global HTTP Security Headers\n"
+                . "if (!headers_sent()) {\n"
+                . "    header('X-Frame-Options: SAMEORIGIN');\n"
+                . "    header('X-Content-Type-Options: nosniff');\n"
+                . "    header('Referrer-Policy: strict-origin-when-cross-origin');\n"
+                . "    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');\n"
+                . "    header('X-XSS-Protection: 1; mode=block');\n"
+                . "    if (IS_HTTPS) {\n"
+                . "        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');\n"
+                . "    }\n"
+                . "}\n\n"
+                . "// Session Inactivity Timeout (60 Minutes)\n"
+                . "define('SESSION_TIMEOUT_SECONDS', 3600);\n\n"
                 . "// Secure Session Cookie Settings\n"
                 . "if (session_status() === PHP_SESSION_NONE) {\n"
                 . "    ini_set('session.cookie_httponly', 1);\n"
                 . "    ini_set('session.use_only_cookies', 1);\n"
+                . "    ini_set('session.use_strict_mode', 1);\n"
                 . "    ini_set('session.cookie_samesite', 'Lax');\n"
-                . "    if (isset(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] === 'on') {\n"
+                . "    if (IS_HTTPS) {\n"
                 . "        ini_set('session.cookie_secure', 1);\n"
                 . "    }\n"
                 . "    session_start();\n"
