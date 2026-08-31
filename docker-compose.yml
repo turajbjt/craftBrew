@@ -39,4 +39,4 @@ services:
 
 volumes:
   db_data:
-    name: brewsite_db_data
+    name: craftbrew_db_data

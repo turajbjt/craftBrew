@@ -112,8 +112,8 @@ CraftBrew can be installed directly on **Bare-Metal LAMP servers** (like OpenCar
 1. **Copy Files**: Extract or clone the project files directly into your web root or subfolder:
    ```bash
    cd /var/www/html/
-   git clone https://github.com/turajbjt/brewSite.git brewsite
-   cd brewsite
+   git clone https://github.com/turajbjt/craftBrew.git craftbrew
+   cd craftbrew
    ```
 
 2. **Set Storage Permissions**:
@@ -124,7 +124,7 @@ CraftBrew can be installed directly on **Bare-Metal LAMP servers** (like OpenCar
    ```
 
 3. **Run Web Setup Wizard**:
-   - Open your browser to `http://<your-server-ip>/brewsite/install.php`
+   - Open your browser to `http://<your-server-ip>/craftbrew/install.php`
    - Enter your **Database Host, Database Name, User, and Password**.
    - Set up your initial **Admin Username, Email, and Password**.
    - Click **Install CraftBrew Platform**. The wizard will automatically create the database, import tables, seed starter categories/recipes, and configure `config.php`!
@@ -137,7 +137,7 @@ When upgrading from an earlier version:
    *(Your `config.php`, user accounts, recipes, batches, and uploaded documents in `assets/docs/` are 100% preserved).*
 
 2. **Run One-Click Web Upgrader**:
-   - Open `http://<your-server-ip>/brewsite/install.php?mode=upgrade` in your browser.
+   - Open `http://<your-server-ip>/craftbrew/install.php?mode=upgrade` in your browser.
    - Click **⚡ Apply Database Upgrades & Complete**.
    
 3. **Alternative CLI Upgrade**:
@@ -152,7 +152,7 @@ When upgrading from an earlier version:
 
 1. Clone or navigate to the project directory:
    ```bash
-   cd ./brewSite
+   cd ./craftBrew
    ```
 
 2. Launch Docker services (MariaDB 10.11 + PHP 8.2 Apache):
@@ -174,7 +174,7 @@ When upgrading from an earlier version:
 ## 📂 Project Directory Overview
 
 ```
-./brewSite/
+./craftBrew/
 ├── config.php                  # Application security & MariaDB PDO configuration (v2.8.0)
 ├── db.php                      # MariaDB PDO connection helper & ABV calculators
 ├── schema.sql                  # MariaDB database schema definition
