@@ -1,6 +1,7 @@
 services:
   web:
-    image: recurringmgt-web:latest
+    build: .
+    image: craftbrew-web:latest
     container_name: craftbrew_web
     command: >
       bash -c "a2enmod rewrite headers ssl socache_shmcb 2>/dev/null || true;
@@ -38,3 +39,4 @@ services:
 
 volumes:
   db_data:
+    name: brewsite_db_data

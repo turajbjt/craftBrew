@@ -12,10 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Auto-calculate ABV on gravity inputs change
-    const ogInput = document.getElementById('calc_og');
-    const fgInput = document.getElementById('calc_fg');
-    const abvOutput = document.getElementById('calc_abv_result');
+    // Auto-calculate ABV & Chaptalization Sugar Boost on gravity inputs change
+    const preOgInput = document.getElementById('calc_pre_og');
+    const ogInput    = document.getElementById('calc_og');
+    const fgInput    = document.getElementById('calc_fg');
+    const abvOutput  = document.getElementById('calc_abv_result');
+    const chaptBadge = document.getElementById('chaptalization_badge');
 
     function calculateABV() {
         if (!ogInput || !fgInput || !abvOutput) return;
@@ -27,12 +29,29 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             abvOutput.textContent = '--%';
         }
+
+        if (preOgInput && chaptBadge) {
+            const preOg = parseFloat(preOgInput.value);
+            if (!isNaN(preOg) && !isNaN(og) && preOg > 1.0 && og > preOg) {
+                const boostPts = ((og - preOg) * 1000).toFixed(0);
+                const boostAbv = ((og - preOg) * 131.25).toFixed(2);
+                chaptBadge.textContent = '🍯 +' + boostPts + ' SG pts (+' + boostAbv + '% ABV via chaptalization)';
+                chaptBadge.style.display = 'block';
+            } else {
+                chaptBadge.textContent = '';
+                chaptBadge.style.display = 'none';
+            }
+        }
     }
 
     if (ogInput && fgInput) {
         ogInput.addEventListener('input', calculateABV);
         fgInput.addEventListener('input', calculateABV);
     }
+    if (preOgInput) {
+        preOgInput.addEventListener('input', calculateABV);
+    }
+    calculateABV();
 });
 
 /**

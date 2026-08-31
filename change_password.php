@@ -41,6 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upStmt = $db->prepare("UPDATE users SET password_hash = ?, must_change_password = 0, password_changed_at = NOW() WHERE id = ?");
             $upStmt->execute([$newHash, $user['id']]);
 
+            // Regenerate session identifier upon credential change (OWASP A07)
+            session_regenerate_id(true);
+
             // Clear session must_change flag
             $_SESSION['must_change_password'] = 0;
 

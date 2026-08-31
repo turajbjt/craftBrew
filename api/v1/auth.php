@@ -46,8 +46,10 @@ if ($lockoutSeconds > 0) {
     exit;
 }
 
+require_once __DIR__ . '/../../includes/TotpService.php';
+
 $db = get_db();
-$stmt = $db->prepare("SELECT id, username, email, password_hash, role, status, must_change_password, api_token FROM users WHERE username = ? OR email = ?");
+$stmt = $db->prepare("SELECT id, username, email, password_hash, role, status, must_change_password, api_token, two_factor_enabled, two_factor_secret FROM users WHERE username = ? OR email = ?");
 $stmt->execute([$username, $username]);
 $user = $stmt->fetch();
 
@@ -72,6 +74,32 @@ if ($user && password_verify($password, $user['password_hash'])) {
             'message' => 'Your account requires an immediate password update. Please sign into the web interface to change your password.'
         ]);
         exit;
+    }
+
+    // Enforce Two-Factor Authentication (2FA) if enabled on account
+    if (!empty($user['two_factor_enabled'])) {
+        $twoFactorCode = trim($input['two_factor_code'] ?? '');
+        if (empty($twoFactorCode)) {
+            http_response_code(401);
+            echo json_encode([
+                'error'               => 'two_factor_required',
+                'message'             => 'Two-Factor Authentication is enabled on this account. Please provide two_factor_code.',
+                'two_factor_required' => true
+            ]);
+            exit;
+        }
+
+        $isValidTotp = TotpService::verifyCode($user['two_factor_secret'] ?? '', $twoFactorCode);
+        $isValidBackup = !$isValidTotp && TotpService::verifyAndConsumeBackupCode($user['id'], $twoFactorCode);
+
+        if (!$isValidTotp && !$isValidBackup) {
+            http_response_code(401);
+            echo json_encode([
+                'error'   => 'invalid_2fa_code',
+                'message' => 'Invalid 6-digit authenticator code or backup recovery code.'
+            ]);
+            exit;
+        }
     }
 
     if (empty($user['api_token'])) {

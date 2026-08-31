@@ -74,6 +74,7 @@ require_once __DIR__ . '/includes/header.php';
             <select name="status" class="form-control">
                 <option value="">All Stages</option>
                 <option value="Planning" <?= $statusFilter === 'Planning' ? 'selected' : '' ?>>Planning</option>
+                <option value="Must Prep" <?= $statusFilter === 'Must Prep' ? 'selected' : '' ?>>Must Prep / Sulfiting</option>
                 <option value="Primary" <?= $statusFilter === 'Primary' ? 'selected' : '' ?>>Primary</option>
                 <option value="Secondary" <?= $statusFilter === 'Secondary' ? 'selected' : '' ?>>Secondary</option>
                 <option value="Bottling/Aging" <?= $statusFilter === 'Bottling/Aging' ? 'selected' : '' ?>>Bottling / Aging</option>

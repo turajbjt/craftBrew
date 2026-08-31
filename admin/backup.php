@@ -13,9 +13,10 @@ require_admin();
 $adminUser = current_user();
 $db = get_db();
 
-// Handle SQL Dump Download
-if (isset($_GET['action']) && $_GET['action'] === 'download_sql') {
-    $filename = 'craftbrew_backup_' . date('Y-m-d_His') . '.sql';
+// Handle SQL Dump Download (Requires POST with CSRF verification - OWASP A01/A07)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'download_sql') {
+    require_csrf_token();
+    $filename = sanitize_header_filename('craftbrew_backup_' . date('Y-m-d_His') . '.sql');
 
     header('Content-Type: application/sql; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -97,9 +98,13 @@ require_once __DIR__ . '/../includes/header.php';
         <h2>💾 Database Backup &amp; System Snapshot</h2>
         <p style="color: var(--text-muted);">Generate and download instant, portable SQL snapshots of your entire brewing dataset.</p>
     </div>
-    <a href="backup.php?action=download_sql" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
-        📥 Download Full Database SQL Backup (.sql)
-    </a>
+    <form method="POST" action="backup.php" style="margin: 0;">
+        <input type="hidden" name="csrf_token" value="<?= e($csrfToken) ?>">
+        <input type="hidden" name="action" value="download_sql">
+        <button type="submit" class="btn btn-primary" style="display: flex; align-items: center; gap: 0.5rem;">
+            📥 Download Full Database SQL Backup (.sql)
+        </button>
+    </form>
 </div>
 
 <!-- Backup Telemetry Cards -->

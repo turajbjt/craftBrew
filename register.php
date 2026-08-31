@@ -47,24 +47,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $regMode !== 'closed') {
         try {
             $db = get_db();
 
-            $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            if ($stmt->fetch()) {
-                $error = "This email address is already registered.";
+            $stmtUser = $db->prepare("SELECT id FROM users WHERE username = ?");
+            $stmtUser->execute([$username]);
+            if ($stmtUser->fetch()) {
+                $error = "This username is already taken. Please choose another username.";
             } else {
-                $hash = password_hash($password, PASSWORD_DEFAULT);
-                $apiToken = generate_api_token();
-                $status = ($regMode === 'invite') ? 'suspended' : 'active';
-
-                $insertStmt = $db->prepare("INSERT INTO users (username, email, password_hash, role, status, api_token) VALUES (?, ?, ?, 'brewer', ?, ?)");
-                $insertStmt->execute([$username, $email, $hash, $status, $apiToken]);
-
-                if ($regMode === 'invite') {
-                    header('Location: login.php?msg=pending_approval');
+                $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+                $stmt->execute([$email]);
+                if ($stmt->fetch()) {
+                    $error = "This email address is already registered.";
                 } else {
-                    header('Location: login.php?msg=registered');
+                    $hash = password_hash($password, PASSWORD_DEFAULT);
+                    $apiToken = generate_api_token();
+                    $status = ($regMode === 'invite') ? 'suspended' : 'active';
+
+                    $insertStmt = $db->prepare("INSERT INTO users (username, email, password_hash, role, status, api_token) VALUES (?, ?, ?, 'brewer', ?, ?)");
+                    $insertStmt->execute([$username, $email, $hash, $status, $apiToken]);
+
+                    if ($regMode === 'invite') {
+                        header('Location: login.php?msg=pending_approval');
+                    } else {
+                        header('Location: login.php?msg=registered');
+                    }
+                    exit;
                 }
-                exit;
             }
         } catch (Exception $e) {
             $error = "Registration failed. Please try again.";

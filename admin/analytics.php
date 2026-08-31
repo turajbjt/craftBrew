@@ -9,16 +9,24 @@ $db = get_db();
 
 // Handle CSV Exports
 if (isset($_GET['export'])) {
-    $export = $_GET['export'];
+    $export = validate_enum($_GET['export'] ?? '', ['users_csv', 'batches_csv'], '');
 
     if ($export === 'users_csv') {
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="craftbrew_users_' . date('Y-m-d') . '.csv"');
+        header('Content-Disposition: attachment; filename="' . sanitize_header_filename('craftbrew_users_' . date('Y-m-d') . '.csv') . '"');
         $out = fopen('php://output', 'w');
         fputcsv($out, ['User ID', 'Username', 'Email', 'Role', 'Status', 'Can Manage Docs', 'Registered Date']);
         $users = $db->query("SELECT id, username, email, role, status, can_manage_docs, created_at FROM users ORDER BY id ASC")->fetchAll();
         foreach ($users as $u) {
-            fputcsv($out, [$u['id'], $u['username'], $u['email'], $u['role'], $u['status'], $u['can_manage_docs'] ? 'Yes' : 'No', $u['created_at']]);
+            fputcsv($out, [
+                sanitize_csv_cell($u['id']),
+                sanitize_csv_cell($u['username']),
+                sanitize_csv_cell($u['email']),
+                sanitize_csv_cell($u['role']),
+                sanitize_csv_cell($u['status']),
+                sanitize_csv_cell($u['can_manage_docs'] ? 'Yes' : 'No'),
+                sanitize_csv_cell($u['created_at'])
+            ]);
         }
         fclose($out);
         exit;
@@ -26,7 +34,7 @@ if (isset($_GET['export'])) {
 
     if ($export === 'batches_csv') {
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="craftbrew_batches_' . date('Y-m-d') . '.csv"');
+        header('Content-Disposition: attachment; filename="' . sanitize_header_filename('craftbrew_batches_' . date('Y-m-d') . '.csv') . '"');
         $out = fopen('php://output', 'w');
         fputcsv($out, ['Batch ID', 'User', 'Batch Name', 'Category', 'Style', 'Volume (Gal)', 'Start Date', 'OG', 'FG', 'ABV (%)', 'Rating', 'Status']);
         $batches = $db->query("
@@ -37,7 +45,20 @@ if (isset($_GET['export'])) {
             ORDER BY b.id DESC
         ")->fetchAll();
         foreach ($batches as $b) {
-            fputcsv($out, [$b['id'], $b['username'], $b['batch_name'], $b['category_name'], $b['batch_style'], $b['batch_size_gal'], $b['date_start'], $b['gravity_og'], $b['gravity_fg'], $b['calculated_abv'], $b['rating'], $b['status']]);
+            fputcsv($out, [
+                sanitize_csv_cell($b['id']),
+                sanitize_csv_cell($b['username']),
+                sanitize_csv_cell($b['batch_name']),
+                sanitize_csv_cell($b['category_name']),
+                sanitize_csv_cell($b['batch_style']),
+                sanitize_csv_cell($b['batch_size_gal']),
+                sanitize_csv_cell($b['date_start']),
+                sanitize_csv_cell($b['gravity_og']),
+                sanitize_csv_cell($b['gravity_fg']),
+                sanitize_csv_cell($b['calculated_abv']),
+                sanitize_csv_cell($b['rating']),
+                sanitize_csv_cell($b['status'])
+            ]);
         }
         fclose($out);
         exit;

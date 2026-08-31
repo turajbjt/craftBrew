@@ -82,10 +82,15 @@ if ($type === 'batch') {
                 <td><strong>Bottled Date:</strong> <?= e($b['date_bottle'] ?: 'N/A') ?></td>
             </tr>
             <tr>
-                <td><strong>Original Gravity (OG):</strong> <?= $b['gravity_og'] ? sprintf('%.3f', $b['gravity_og']) : 'N/A' ?></td>
+                <td><strong><?= !empty($b['gravity_pre_og']) ? 'Starting OG (Post-Sugar):' : 'Original Gravity (OG):' ?></strong> <?= $b['gravity_og'] ? sprintf('%.3f', $b['gravity_og']) : 'N/A' ?></td>
                 <td><strong>Final Gravity (FG):</strong> <?= $b['gravity_fg'] ? sprintf('%.3f', $b['gravity_fg']) : 'N/A' ?></td>
                 <td><strong>Calculated ABV:</strong> <strong><?= $b['calculated_abv'] ? e($b['calculated_abv']) . '%' : 'N/A' ?></strong></td>
             </tr>
+            <?php if (!empty($b['gravity_pre_og'])): ?>
+            <tr>
+                <td colspan="3"><strong>Base Juice OG (Raw Pressed):</strong> <?= sprintf('%.3f', $b['gravity_pre_og']) ?> <?php if ($b['gravity_og'] > $b['gravity_pre_og']): ?><span style="color: #d97706; font-weight: bold;">(🍯 +<?= round(($b['gravity_og'] - $b['gravity_pre_og']) * 1000) ?> pts via chaptalization)</span><?php endif; ?></td>
+            </tr>
+            <?php endif; ?>
             <tr>
                 <td><strong>Pitch Temp:</strong> <?= e($b['pitch_temp_f'] ?: 'N/A') ?></td>
                 <td><strong>Ferment Temp:</strong> <?= e($b['ferment_temp_f'] ?: 'N/A') ?></td>
@@ -235,11 +240,16 @@ if ($type === 'batch') {
                 <td><strong>Target Size:</strong> <?= (float)$r['batch_size_gal'] ?> Gallons</td>
             </tr>
             <tr>
-                <td><strong>Target Original Gravity:</strong> <?= $r['target_og'] ? sprintf('%.3f', $r['target_og']) : 'N/A' ?></td>
+                <td><strong><?= !empty($r['target_pre_og']) ? 'Starting OG (Post-Sugar):' : 'Target Original Gravity:' ?></strong> <?= $r['target_og'] ? sprintf('%.3f', $r['target_og']) : 'N/A' ?></td>
                 <td><strong>Target Final Gravity:</strong> <?= $r['target_fg'] ? sprintf('%.3f', $r['target_fg']) : 'N/A' ?></td>
             </tr>
+            <?php if (!empty($r['target_pre_og'])): ?>
             <tr>
-                <td colspan="2"><strong>Estimated ABV:</strong> <strong><?= $r['target_abv'] ? e($r['target_abv']) . '%' : 'N/A' ?></strong></td>
+                <td colspan="2"><strong>Base Juice OG (Raw Pressed):</strong> <?= sprintf('%.3f', $r['target_pre_og']) ?> <?php if ($r['target_og'] > $r['target_pre_og']): ?><span style="color: #d97706; font-weight: bold;">(🍯 +<?= round(($r['target_og'] - $r['target_pre_og']) * 1000) ?> pts via chaptalization)</span><?php endif; ?></td>
+            </tr>
+            <?php endif; ?>
+            <tr>
+                <td colspan="2"><strong>Estimated Total ABV:</strong> <strong><?= $r['target_abv'] ? e($r['target_abv']) . '%' : 'N/A' ?></strong></td>
             </tr>
         </table>
 

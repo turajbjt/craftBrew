@@ -27,6 +27,7 @@ $b = [
     'date_bottle' => '',
     'pitch_temp_f' => '72F',
     'ferment_temp_f' => '68F',
+    'gravity_pre_og' => '',
     'gravity_og' => '',
     'gravity_sg' => '',
     'gravity_fg' => '',
@@ -58,6 +59,7 @@ if ($action === 'edit' && $batchId > 0) {
         $b['batch_type']      = $rec['name'];
         $b['batch_style']     = $rec['style'];
         $b['batch_size_gal']  = $rec['batch_size_gal'];
+        $b['gravity_pre_og']  = $rec['target_pre_og'] ?? '';
         $b['gravity_og']      = $rec['target_og'];
         $b['gravity_fg']      = $rec['target_fg'];
         $b['ingredients']     = $rec['ingredients'];
@@ -84,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dateBottle  = validate_date($_POST['date_bottle'] ?? null);
     $pitchTemp   = validate_temp($_POST['pitch_temp_f'] ?? '');
     $fermentTemp = validate_temp($_POST['ferment_temp_f'] ?? '');
+    $preOg       = validate_gravity($_POST['gravity_pre_og'] ?? null);
     $og          = validate_gravity($_POST['gravity_og'] ?? null);
     $sg          = validate_gravity($_POST['gravity_sg'] ?? null);
     $fg          = validate_gravity($_POST['gravity_fg'] ?? null);
@@ -92,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $reflections = sanitize_text($_POST['reflections'] ?? '', 5000);
     $rating      = validate_rating($_POST['rating'] ?? 0);
     
-    $allowedStatuses = ['Planning', 'Primary', 'Secondary', 'Bottling/Aging', 'Completed'];
+    $allowedStatuses = ['Planning', 'Must Prep', 'Primary', 'Secondary', 'Bottling/Aging', 'Completed'];
     $status      = validate_enum($_POST['status'] ?? '', $allowedStatuses, 'Primary');
 
     if (empty($batchName)) {
@@ -105,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 UPDATE batches SET
                     recipe_id = ?, category_id = ?, batch_name = ?, batch_type = ?, batch_style = ?,
                     batch_size_gal = ?, date_start = ?, date_rack = ?, date_rack_2 = ?, date_rack_3 = ?, date_bottle = ?,
-                    pitch_temp_f = ?, ferment_temp_f = ?, gravity_og = ?, gravity_sg = ?,
+                    pitch_temp_f = ?, ferment_temp_f = ?, gravity_pre_og = ?, gravity_og = ?, gravity_sg = ?,
                     gravity_fg = ?, calculated_abv = ?, ingredients = ?, boil_notes = ?,
                     reflections = ?, rating = ?, status = ?
                 WHERE id = ? AND user_id = ?
@@ -113,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $up->execute([
                 $recId, $catId, $batchName, $batchType, $batchStyle,
                 $batchSize, $dateStart ?: null, $dateRack ?: null, $dateRack2 ?: null, $dateRack3 ?: null, $dateBottle ?: null,
-                $pitchTemp, $fermentTemp, $og, $sg,
+                $pitchTemp, $fermentTemp, $preOg, $og, $sg,
                 $fg, $abv, $ingredients, $boilNotes,
                 $reflections, $rating, $status,
                 $b['id'], $user['id']
@@ -125,13 +128,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 INSERT INTO batches (
                     user_id, recipe_id, category_id, batch_name, batch_type, batch_style,
                     batch_size_gal, date_start, date_rack, date_rack_2, date_rack_3, date_bottle,
-                    pitch_temp_f, ferment_temp_f, gravity_og, gravity_sg,
+                    pitch_temp_f, ferment_temp_f, gravity_pre_og, gravity_og, gravity_sg,
                     gravity_fg, calculated_abv, ingredients, boil_notes,
                     reflections, rating, status
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?
                 )
@@ -139,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins->execute([
                 $user['id'], $recId, $catId, $batchName, $batchType, $batchStyle,
                 $batchSize, $dateStart ?: null, $dateRack ?: null, $dateRack2 ?: null, $dateRack3 ?: null, $dateBottle ?: null,
-                $pitchTemp, $fermentTemp, $og, $sg,
+                $pitchTemp, $fermentTemp, $preOg, $og, $sg,
                 $fg, $abv, $ingredients, $boilNotes,
                 $reflections, $rating, $status
             ]);
@@ -207,6 +210,7 @@ require_once __DIR__ . '/includes/header.php';
                     <label class="form-label">Current Stage / Status</label>
                     <select name="status" class="form-control">
                         <option value="Planning" <?= $b['status'] === 'Planning' ? 'selected' : '' ?>>Planning</option>
+                        <option value="Must Prep" <?= $b['status'] === 'Must Prep' ? 'selected' : '' ?>>Must Prep / Sulfiting (Pre-Ferment)</option>
                         <option value="Primary" <?= $b['status'] === 'Primary' ? 'selected' : '' ?>>Primary Fermentation</option>
                         <option value="Secondary" <?= $b['status'] === 'Secondary' ? 'selected' : '' ?>>Secondary / Racking</option>
                         <option value="Bottling/Aging" <?= $b['status'] === 'Bottling/Aging' ? 'selected' : '' ?>>Bottling / Aging</option>
@@ -242,22 +246,37 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div class="form-row">
+            <div class="form-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                 <div class="form-group">
-                    <label class="form-label">Original Gravity (OG)</label>
-                    <input type="number" step="0.001" id="calc_og" name="gravity_og" class="form-control" value="<?= e($b['gravity_og']) ?>" placeholder="1.050">
+                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>Raw Must/Juice OG</span>
+                        <small style="color: var(--text-muted); font-weight: normal;">(Pre-Sugar/Optional)</small>
+                    </label>
+                    <input type="number" step="0.001" id="calc_pre_og" name="gravity_pre_og" class="form-control" value="<?= e($b['gravity_pre_og'] ?? '') ?>" placeholder="e.g. 1.045 (Raw pressed juice)">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">Initial raw juice reading before adding sugar/chaptalization.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>Starting OG</span>
+                        <small style="color: var(--text-muted); font-weight: normal;">(Post-Sugar/Inoculated)</small>
+                    </label>
+                    <input type="number" step="0.001" id="calc_og" name="gravity_og" class="form-control" value="<?= e($b['gravity_og']) ?>" placeholder="e.g. 1.085 (Pitch gravity)">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">Starting OG when fermentation begins.</small>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Final Gravity (FG)</label>
-                    <input type="number" step="0.001" id="calc_fg" name="gravity_fg" class="form-control" value="<?= e($b['gravity_fg']) ?>" placeholder="1.010">
+                    <input type="number" step="0.001" id="calc_fg" name="gravity_fg" class="form-control" value="<?= e($b['gravity_fg']) ?>" placeholder="e.g. 0.998">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">Final finished gravity measurement.</small>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Calculated ABV</label>
+                    <label class="form-label">Calculated Total ABV</label>
                     <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color); padding: 0.4rem 0;" id="calc_abv_result">
                         <?= $b['calculated_abv'] ? e($b['calculated_abv']) . '%' : '--%' ?>
                     </div>
+                    <small id="chaptalization_badge" style="color: #b45309; font-size: 0.8rem; font-weight: 700; display: none;"></small>
                 </div>
             </div>
 

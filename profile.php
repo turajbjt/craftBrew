@@ -369,6 +369,22 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Data Export & Backup Center Card -->
+<div class="card" style="margin-bottom: 2rem; border-left: 6px solid var(--primary-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h3 class="card-title" style="margin-bottom: 0.25rem;">💾 Download &amp; Restore My Data</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">
+                Export your recipes, brew batch logs, fermentation gravity drop curves, and cellar inventory in JSON, CSV, or BeerXML format. You can also restore data anytime.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="data_manager.php?action=export&format=zip" class="btn btn-primary">⚡ 1-Click Export (ZIP)</a>
+            <a href="data_manager.php" class="btn btn-secondary">Open Data Center &raquo;</a>
+        </div>
+    </div>
+</div>
+
 <script>
 function copyApiToken() {
     const field = document.getElementById('apiTokenField');

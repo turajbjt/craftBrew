@@ -535,6 +535,70 @@ function validate_enum($val, array $allowed, $default = '') {
     return in_array($val, $allowed, true) ? $val : $default;
 }
 
+/**
+ * CSV Formula Injection (CSV Injection) Guard - OWASP A03
+ * Prevents Excel/LibreOffice execution of formula commands (=, +, -, @, \t, \r, %)
+ */
+function sanitize_csv_cell($val) {
+    if ($val === null || $val === '') return '';
+    $str = (string)$val;
+    $firstChar = substr($str, 0, 1);
+    if (in_array($firstChar, ['=', '+', '-', '@', "\t", "\r", '%'], true)) {
+        return "'" . $str;
+    }
+    return $str;
+}
+
+/**
+ * Secure HTTP Header Filename Sanitizer - OWASP A05
+ * Prevents CRLF Response Splitting and Header Injection
+ */
+function sanitize_header_filename($filename) {
+    $clean = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', $filename);
+    $clean = str_replace(['..', '/', '\\'], '_', $clean);
+    return substr($clean, 0, 100) ?: 'export_data';
+}
+
+/**
+ * XXE (XML External Entity) Injection Guard - OWASP A03 / A08
+ * Disables external entity resolution, DTD loading, and network access in XML parsing
+ */
+function parse_xml_safely($xmlString, &$errorMsg = '') {
+    if (empty($xmlString) || !is_string($xmlString)) {
+        $errorMsg = "Empty or invalid XML payload.";
+        return null;
+    }
+
+    // Limit XML size to prevent memory exhaustion / XML entity expansion bomb
+    if (strlen($xmlString) > 10 * 1024 * 1024) { // 10 MB limit
+        $errorMsg = "XML payload exceeds maximum permitted size (10 MB).";
+        return null;
+    }
+
+    // Basic heuristic check for entity declarations to prevent XML bombs early
+    if (stripos($xmlString, '<!ENTITY') !== false || stripos($xmlString, '<!DOCTYPE') !== false) {
+        // Disable DTD loading
+        $xmlString = preg_replace('/<!DOCTYPE[^>]*>/i', '', $xmlString);
+    }
+
+    libxml_use_internal_errors(true);
+    $flags = LIBXML_NONET | LIBXML_NOBLANKS;
+    if (defined('LIBXML_NOENT')) {
+        // Ensure entity substitute is off
+        $flags = $flags & ~LIBXML_NOENT;
+    }
+
+    $xml = @simplexml_load_string($xmlString, 'SimpleXMLElement', $flags);
+    if ($xml === false) {
+        $errors = libxml_get_errors();
+        libxml_clear_errors();
+        $errorMsg = !empty($errors) ? trim($errors[0]->message) : "Failed to parse XML.";
+        return null;
+    }
+
+    return $xml;
+}
+
 function log_admin_action($action, $details = '', $targetType = '', $targetId = null) {
     try {
         $admin = current_user();

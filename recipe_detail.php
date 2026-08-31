@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
+require_once __DIR__ . '/includes/bjcp_styles.php';
 
 require_login();
 $user = current_user();
@@ -27,21 +28,23 @@ $details = get_recipe_details($recipeId);
 $ingredients = $details['ingredients'];
 $supplies    = $details['supplies'];
 $steps       = $details['steps'];
+$bjcpStyle   = find_bjcp_style($r['style']);
 
 // Handle Recipe Exports (BeerXML & JSON)
 if (isset($_GET['export'])) {
-    $expType = $_GET['export'];
-    $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $r['name']);
+    $expType = validate_enum($_GET['export'] ?? '', ['json', 'beerxml'], 'json');
+    $cleanName = sanitize_header_filename($r['name'] ?: 'recipe');
 
     if ($expType === 'json') {
         header('Content-Type: application/json; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $cleanName . '_recipe.json"');
+        header('Content-Disposition: attachment; filename="' . sanitize_header_filename($cleanName . '_recipe.json') . '"');
         $exportData = [
             'generator'       => APP_NAME . ' v' . APP_VERSION,
             'name'            => $r['name'],
             'category'        => $r['category_name'],
             'style'           => $r['style'],
             'batch_size_gal'  => (float)$r['batch_size_gal'],
+            'target_pre_og'   => $r['target_pre_og'] ? (float)$r['target_pre_og'] : null,
             'target_og'       => $r['target_og'] ? (float)$r['target_og'] : null,
             'target_fg'       => $r['target_fg'] ? (float)$r['target_fg'] : null,
             'target_abv'      => $r['target_abv'] ? (float)$r['target_abv'] : null,
@@ -130,6 +133,8 @@ require_once __DIR__ . '/includes/header.php';
         <?php if ($r['user_id'] == $user['id']): ?>
             <a href="recipe_edit.php?action=edit&id=<?= (int)$r['id'] ?>" class="btn btn-secondary">✏️ Edit</a>
         <?php endif; ?>
+        <a href="scale_recipe.php?id=<?= (int)$r['id'] ?>" class="btn btn-secondary" title="Scale recipe to another volume or efficiency">⚖️ Scale Recipe</a>
+        <a href="labels.php?recipe_id=<?= (int)$r['id'] ?>" class="btn btn-secondary" title="Print bottle & keg labels" target="_blank">🏷️ Print Labels</a>
         <a href="batch_edit.php?action=new&recipe_id=<?= (int)$r['id'] ?>" class="btn btn-primary">🍺 Start Batch</a>
         <a href="export_pdf.php?type=recipe&id=<?= (int)$r['id'] ?>" class="btn btn-secondary" target="_blank">📄 PDF</a>
         <a href="recipe_detail.php?id=<?= (int)$r['id'] ?>&export=beerxml" class="btn btn-secondary" title="Export standard BeerXML format">📤 BeerXML</a>
@@ -137,23 +142,46 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php if (isset($_GET['scaled_success'])): ?>
+    <div class="alert alert-success" style="margin-bottom: 1.5rem;">
+        ✅ <strong>Scaled Recipe Saved!</strong> Successfully created new batch formulation in your recipe library.
+    </div>
+<?php endif; ?>
+
 <!-- Specs Header Cards -->
 <div class="card-grid" style="margin-bottom: 2rem;">
     <div class="card">
         <div class="card-subtitle">Target Batch Size</div>
         <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary-color);"><?= (float)$r['batch_size_gal'] ?> Gal</div>
+        <small style="color: var(--text-muted);">Brew formulation volume</small>
     </div>
+    <?php if (!empty($r['target_pre_og'])): ?>
+        <div class="card" style="border-left: 4px solid #b45309;">
+            <div class="card-subtitle">Base Juice OG (Raw)</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #b45309;"><?= sprintf('%.3f', $r['target_pre_og']) ?></div>
+            <small style="color: var(--text-muted);">Pre-sugar pressed juice</small>
+        </div>
+    <?php endif; ?>
     <div class="card">
-        <div class="card-subtitle">Target Original Gravity</div>
-        <div style="font-size: 1.8rem; font-weight: 700; color: #1e293b;"><?= $r['target_og'] ? sprintf('%.3f', $r['target_og']) : 'N/A' ?></div>
+        <div class="card-subtitle"><?= !empty($r['target_pre_og']) ? 'Starting OG (Post-Sugar)' : 'Target Original Gravity' ?></div>
+        <div style="font-size: 1.8rem; font-weight: 700; color: #1e293b;">
+            <?= $r['target_og'] ? sprintf('%.3f', $r['target_og']) : 'N/A' ?>
+        </div>
+        <?php if (!empty($r['target_pre_og']) && !empty($r['target_og']) && $r['target_og'] > $r['target_pre_og']): ?>
+            <small style="color: #b45309; font-weight: 700;">🍯 +<?= round(($r['target_og'] - $r['target_pre_og']) * 1000) ?> pts via chaptalization</small>
+        <?php else: ?>
+            <small style="color: var(--text-muted);">Inoculation gravity</small>
+        <?php endif; ?>
     </div>
     <div class="card">
         <div class="card-subtitle">Target Final Gravity</div>
         <div style="font-size: 1.8rem; font-weight: 700; color: #10b981;"><?= $r['target_fg'] ? sprintf('%.3f', $r['target_fg']) : 'N/A' ?></div>
+        <small style="color: var(--text-muted);">Expected finished FG</small>
     </div>
     <div class="card">
         <div class="card-subtitle">Estimated ABV</div>
         <div style="font-size: 1.8rem; font-weight: 700; color: #3b82f6;"><?= $r['target_abv'] ? e($r['target_abv']) . '%' : 'N/A' ?></div>
+        <small style="color: var(--text-muted);">Potential alcohol strength</small>
     </div>
 </div>
 
@@ -217,8 +245,27 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <!-- Sidebar: Equipment & Supplies Checklist -->
-    <div>
+    <!-- Sidebar: BJCP Style Match & Equipment Checklist -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <?php if ($bjcpStyle): ?>
+            <div class="card" style="border-top: 4px solid #d97706;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h3 class="card-title" style="margin: 0;">🎯 BJCP Style Targets</h3>
+                    <span class="badge badge-warning"><?= e($bjcpStyle['name']) ?></span>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.35;">
+                    <?= e($bjcpStyle['description']) ?>
+                </p>
+
+                <?= render_bjcp_target_gauge('Original Gravity (OG)', $r['target_og'], $bjcpStyle['og_min'], $bjcpStyle['og_max'], '', 3) ?>
+                <?= render_bjcp_target_gauge('Final Gravity (FG)', $r['target_fg'], $bjcpStyle['fg_min'], $bjcpStyle['fg_max'], '', 3) ?>
+                <?= render_bjcp_target_gauge('Alcohol by Volume (ABV)', $r['target_abv'], $bjcpStyle['abv_min'], $bjcpStyle['abv_max'], '%', 1) ?>
+                <?php if ($bjcpStyle['ibu_max'] > 0): ?>
+                    <?= render_bjcp_target_gauge('Target Bitterness (IBU)', null, $bjcpStyle['ibu_min'], $bjcpStyle['ibu_max'], 'IBU', 0) ?>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
         <div class="card">
             <h3 class="card-title">🛠️ Equipment & Supplies</h3>
             <?php if (empty($supplies)): ?>

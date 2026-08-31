@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
+require_once __DIR__ . '/includes/bjcp_styles.php';
 
 require_login();
 $user = current_user();
@@ -9,39 +10,7 @@ $db = get_db();
 
 $batchId = sanitize_int($_GET['id'] ?? 0);
 
-// Handle new gravity reading submission
-$msg = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_reading') {
-    require_csrf_token();
-
-    $gravity = sanitize_float($_POST['gravity'] ?? 0);
-    $tempF   = sanitize_text($_POST['temp_f'] ?? '', 10);
-    $notes   = sanitize_text($_POST['notes'] ?? '', 1000);
-    $readingDate = sanitize_text($_POST['reading_date'] ?? date('Y-m-d H:i:s'), 20);
-
-    if ($gravity > 0) {
-        $insR = $db->prepare("INSERT INTO fermentation_readings (batch_id, reading_date, gravity, temp_f, notes) VALUES (?, ?, ?, ?, ?)");
-        $insR->execute([$batchId, $readingDate, $gravity, $tempF, $notes]);
-
-        // Update latest SG and calculated ABV in batch
-        $bChk = $db->prepare("SELECT gravity_og, gravity_fg FROM batches WHERE id = ?");
-        $bChk->execute([$batchId]);
-        $bRow = $bChk->fetch();
-        if ($bRow && $bRow['gravity_og']) {
-            $fgVal = $bRow['gravity_fg'] ?: $gravity;
-            $newAbv = calculate_abv((float)$bRow['gravity_og'], (float)$fgVal);
-            $upB = $db->prepare("UPDATE batches SET gravity_sg = ?, calculated_abv = ? WHERE id = ?");
-            $upB->execute([$gravity, $newAbv, $batchId]);
-        } else {
-            $upB = $db->prepare("UPDATE batches SET gravity_sg = ? WHERE id = ?");
-            $upB->execute([$gravity, $batchId]);
-        }
-
-        $msg = "Specific Gravity reading recorded successfully!";
-    }
-}
-
-// Fetch batch info
+// Fetch batch info & verify ownership first (OWASP A01: Broken Access Control Guard)
 $stmt = $db->prepare("
     SELECT b.*, c.name as category_name, r.name as recipe_name
     FROM batches b
@@ -54,6 +23,39 @@ $b = $stmt->fetch();
 
 if (!$b) {
     die("Batch log not found or access denied.");
+}
+
+$bjcpStyle = find_bjcp_style($b['batch_style']);
+
+// Handle new gravity reading submission
+$msg = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_reading') {
+    require_csrf_token();
+
+    $gravity = validate_gravity($_POST['gravity'] ?? 0);
+    $tempF   = validate_temp($_POST['temp_f'] ?? '', '');
+    $notes   = sanitize_text($_POST['notes'] ?? '', 1000);
+    $readingDate = sanitize_text($_POST['reading_date'] ?? date('Y-m-d H:i:s'), 20);
+
+    if ($gravity && $gravity > 0) {
+        $insR = $db->prepare("INSERT INTO fermentation_readings (batch_id, reading_date, gravity, temp_f, notes) VALUES (?, ?, ?, ?, ?)");
+        $insR->execute([$b['id'], $readingDate, $gravity, $tempF, $notes]);
+
+        // Update latest SG and calculated ABV in batch
+        if (!empty($b['gravity_og'])) {
+            $fgVal = !empty($b['gravity_fg']) ? $b['gravity_fg'] : $gravity;
+            $newAbv = calculate_abv((float)$b['gravity_og'], (float)$fgVal);
+            $upB = $db->prepare("UPDATE batches SET gravity_sg = ?, calculated_abv = ? WHERE id = ?");
+            $upB->execute([$gravity, $newAbv, $b['id']]);
+            $b['calculated_abv'] = $newAbv;
+        } else {
+            $upB = $db->prepare("UPDATE batches SET gravity_sg = ? WHERE id = ?");
+            $upB->execute([$gravity, $b['id']]);
+        }
+        $b['gravity_sg'] = $gravity;
+
+        $msg = "Specific Gravity reading recorded successfully!";
+    }
 }
 
 // Fetch structured recipe components if batch linked to a recipe
@@ -109,8 +111,9 @@ require_once __DIR__ . '/includes/header.php';
             <?php endif; ?>
         </p>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
         <a href="batch_edit.php?action=edit&id=<?= (int)$b['id'] ?>" class="btn btn-secondary">✏️ Edit Batch</a>
+        <a href="labels.php?batch_id=<?= (int)$b['id'] ?>" class="btn btn-secondary" target="_blank" title="Design and print bottle & keg labels">🏷️ Print Labels</a>
         <a href="export_pdf.php?type=batch&id=<?= (int)$b['id'] ?>" class="btn btn-primary" target="_blank">📄 Export PDF Sheet</a>
     </div>
 </div>
@@ -134,7 +137,16 @@ require_once __DIR__ . '/includes/header.php';
 
         <div style="color: var(--text-muted); font-size: 1.2rem;">➔</div>
 
-        <!-- Timeline Step 2: Primary -->
+        <!-- Timeline Step 2: Must Prep / Sulfiting -->
+        <div style="flex: 1; min-width: 110px; text-align: center; background: <?= ($b['status'] === 'Must Prep' || $b['status'] === 'Primary' || $b['date_rack'] || $b['date_bottle']) ? '#fae8ff' : '#f8fafc' ?>; padding: 0.75rem; border-radius: 8px; border: 1px solid <?= ($b['status'] === 'Must Prep' || $b['status'] === 'Primary' || $b['date_rack'] || $b['date_bottle']) ? '#f5d0fe' : '#e2e8f0' ?>;">
+            <div style="font-size: 1.2rem;">🍇</div>
+            <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dark);">Must Prep</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);"><?= $b['status'] === 'Must Prep' ? 'Active / Sulfiting' : 'Completed' ?></div>
+        </div>
+
+        <div style="color: var(--text-muted); font-size: 1.2rem;">➔</div>
+
+        <!-- Timeline Step 3: Primary -->
         <div style="flex: 1; min-width: 110px; text-align: center; background: <?= ($b['status'] === 'Primary' || $b['date_rack'] || $b['date_bottle']) ? '#eff6ff' : '#f8fafc' ?>; padding: 0.75rem; border-radius: 8px; border: 1px solid <?= ($b['status'] === 'Primary' || $b['date_rack'] || $b['date_bottle']) ? '#bfdbfe' : '#e2e8f0' ?>;">
             <div style="font-size: 1.2rem;">🍺</div>
             <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dark);">Primary</div>
@@ -192,12 +204,26 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Core Metrics Grid -->
 <div class="card-grid" style="margin-bottom: 2rem;">
+    <?php if (!empty($b['gravity_pre_og'])): ?>
+        <div class="card" style="border-left: 4px solid #b45309;">
+            <div class="card-subtitle">Raw Must OG (Pre-Sugar)</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #b45309;">
+                <?= sprintf('%.3f', $b['gravity_pre_og']) ?>
+            </div>
+            <small style="color: var(--text-muted);">Fresh juice before sugar</small>
+        </div>
+    <?php endif; ?>
+
     <div class="card">
-        <div class="card-subtitle">Original Gravity (OG)</div>
+        <div class="card-subtitle"><?= !empty($b['gravity_pre_og']) ? 'Starting OG (Post-Sugar)' : 'Original Gravity (OG)' ?></div>
         <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary-color);">
             <?= $b['gravity_og'] ? sprintf('%.3f', $b['gravity_og']) : 'Not Set' ?>
         </div>
-        <small style="color: var(--text-muted);">Pitch Temp: <?= e($b['pitch_temp_f'] ?: 'N/A') ?></small>
+        <?php if (!empty($b['gravity_pre_og']) && !empty($b['gravity_og']) && $b['gravity_og'] > $b['gravity_pre_og']): ?>
+            <small style="color: #b45309; font-weight: 700;">🍯 +<?= round(($b['gravity_og'] - $b['gravity_pre_og']) * 1000) ?> pts via chaptalization</small>
+        <?php else: ?>
+            <small style="color: var(--text-muted);">Pitch Temp: <?= e($b['pitch_temp_f'] ?: 'N/A') ?></small>
+        <?php endif; ?>
     </div>
 
     <div class="card">
@@ -346,10 +372,26 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Sidebar Info & Add Reading Form -->
-    <div>
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <?php if ($bjcpStyle): ?>
+            <div class="card" style="border-top: 4px solid #d97706;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 class="card-title" style="margin: 0;">🎯 BJCP Style Targets</h3>
+                    <span class="badge badge-warning"><?= e($bjcpStyle['name']) ?></span>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.35;">
+                    <?= e($bjcpStyle['description']) ?>
+                </p>
+
+                <?= render_bjcp_target_gauge('Original Gravity (OG)', $b['gravity_og'], $bjcpStyle['og_min'], $bjcpStyle['og_max'], '', 3) ?>
+                <?= render_bjcp_target_gauge('Current/Final Gravity (FG)', $b['gravity_fg'] ?: $b['gravity_sg'], $bjcpStyle['fg_min'], $bjcpStyle['fg_max'], '', 3) ?>
+                <?= render_bjcp_target_gauge('Alcohol by Volume (ABV)', $b['calculated_abv'], $bjcpStyle['abv_min'], $bjcpStyle['abv_max'], '%', 1) ?>
+            </div>
+        <?php endif; ?>
+
         <?php if (!empty($recipeDetails['supplies'])): ?>
             <!-- 🛠️ Equipment Checklist Sidebar -->
-            <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card">
                 <h3 class="card-title">🛠️ Equipment Checklist</h3>
                 <ul style="list-style: none; margin-top: 0.75rem; padding: 0;">
                     <?php foreach ($recipeDetails['supplies'] as $sup): ?>

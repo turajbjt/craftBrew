@@ -240,7 +240,10 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </form>
 
-    <button type="button" class="btn btn-primary" onclick="openAddUserModal()">➕ Add New User</button>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="transfer.php" class="btn btn-secondary">🔄 Migrate / Copy Data</a>
+        <button type="button" class="btn btn-primary" onclick="openAddUserModal()">➕ Add New User</button>
+    </div>
 </div>
 
 <!-- Users Table -->
@@ -298,6 +301,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </td>
                         <td style="text-align: right; white-space: nowrap;">
                             <div style="display: inline-flex; gap: 0.25rem;">
+                                <a href="transfer.php?source_id=<?= (int)$u['id'] ?>" class="btn btn-secondary btn-sm" title="Transfer or copy this user's records to another user">🔄 Transfer</a>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick='openEditModal(<?= json_encode($u) ?>)'>Edit</button>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick='openPasswordModal(<?= (int)$u["id"] ?>, "<?= e($u["username"]) ?>")'>Pass</button>
                                 <?php if ($u['id'] !== $adminUser['id']): ?>

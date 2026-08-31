@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     // Save structured ingredients
                     if (!empty($data['ingredients']) && is_array($data['ingredients'])) {
-                        $ingIns = $db->prepare("INSERT INTO recipe_ingredients (recipe_id, name, ingredient_type, amount, unit, stage_addition, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $ingIns = $db->prepare("INSERT INTO recipe_ingredients (recipe_id, name, ingredient_type, amount, unit, stage_addition, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
                         foreach ($data['ingredients'] as $idx => $ing) {
                             $ingIns->execute([
                                 $newRecipeId,
@@ -60,24 +60,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 sanitize_float($ing['amount'] ?? 0),
                                 sanitize_text($ing['unit'] ?? 'lbs', 20),
                                 sanitize_text($ing['stage_addition'] ?? 'Primary', 50),
-                                sanitize_text($ing['notes'] ?? '', 255),
-                                $idx
+                                sanitize_text($ing['notes'] ?? '', 255)
                             ]);
                         }
                     }
 
                     // Save structured steps
                     if (!empty($data['steps']) && is_array($data['steps'])) {
-                        $stepIns = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, step_name, target_temp_f, duration_minutes, description, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $stepIns = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
                         foreach ($data['steps'] as $idx => $st) {
                             $stepIns->execute([
                                 $newRecipeId,
                                 $idx + 1,
-                                sanitize_text($st['step_name'] ?? 'Step', 100),
-                                validate_temp($st['target_temp_f'] ?? ''),
-                                sanitize_int($st['duration_minutes'] ?? 0),
-                                sanitize_text($st['description'] ?? '', 2000),
-                                $idx
+                                sanitize_text($st['phase'] ?? 'Brew Day', 50),
+                                sanitize_text($st['title'] ?? ($st['step_name'] ?? 'Step'), 150),
+                                sanitize_text($st['duration'] ?? ($st['duration_minutes'] ?? ''), 50),
+                                sanitize_text($st['target_temp'] ?? ($st['target_temp_f'] ?? ''), 30),
+                                sanitize_text($st['instructions'] ?? ($st['description'] ?? ''), 2000)
                             ]);
                         }
                     }
@@ -88,11 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             // Handle BeerXML import
             if ($ext === 'xml') {
-                libxml_use_internal_errors(true);
-                $xml = simplexml_load_string($content);
+                $xmlErr = '';
+                $xml = parse_xml_safely($content, $xmlErr);
 
                 if (!$xml || !isset($xml->RECIPE)) {
-                    $error = "Invalid or unparseable BeerXML format.";
+                    $error = "Invalid or unparseable BeerXML format: " . htmlspecialchars($xmlErr, ENT_QUOTES, 'UTF-8');
                 } else {
                     $rec = $xml->RECIPE;
                     $recipeName = sanitize_text((string)$rec->NAME, 100) ?: 'Imported BeerXML Recipe';
@@ -113,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $ins->execute([$user['id'], $catId, $recipeName, $style, $batchSizeGal, $og, $fg, $abv, $notes]);
                     $newRecipeId = (int)$db->lastInsertId();
 
-                    $ingIns = $db->prepare("INSERT INTO recipe_ingredients (recipe_id, name, ingredient_type, amount, unit, stage_addition, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    $ingIns = $db->prepare("INSERT INTO recipe_ingredients (recipe_id, name, ingredient_type, amount, unit, stage_addition, notes) VALUES (?, ?, ?, ?, ?, ?, ?)");
                     $order = 0;
 
                     if (isset($rec->FERMENTABLES->FERMENTABLE)) {
@@ -230,9 +229,12 @@ require_once __DIR__ . '/includes/header.php';
                     <div>ABV: <strong><?= $r['target_abv'] ? e($r['target_abv']) . '%' : '--' ?></strong></div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
                     <small style="color: var(--text-muted);">By: <?= e($r['username']) ?></small>
-                    <a href="recipe_detail.php?id=<?= (int)$r['id'] ?>" class="btn btn-secondary btn-sm">View Details &raquo;</a>
+                    <div style="display: flex; gap: 0.35rem;">
+                        <a href="scale_recipe.php?id=<?= (int)$r['id'] ?>" class="btn btn-secondary btn-sm" title="Scale recipe volume or efficiency">⚖️ Scale</a>
+                        <a href="recipe_detail.php?id=<?= (int)$r['id'] ?>" class="btn btn-secondary btn-sm">View Details &raquo;</a>
+                    </div>
                 </div>
             </div>
         <?php endforeach; ?>

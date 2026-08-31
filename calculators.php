@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
+require_once __DIR__ . '/includes/bjcp_styles.php';
 
 require_login();
 
@@ -483,7 +484,80 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         <?php endif; ?>
     </div>
+
+    <!-- 🎯 BJCP Style Guidelines Explorer -->
+    <div class="card" id="calc-bjcp" style="grid-column: 1 / -1; border-left: 4px solid #d97706;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h3 class="card-title" style="margin: 0;">🎯 BJCP Style Guidelines Explorer</h3>
+            <span class="badge badge-warning">BJCP 2021 Reference</span>
+        </div>
+        <p class="card-subtitle">Search and inspect official BJCP target gravity, ABV, IBU, and color ranges.</p>
+
+        <div style="margin-bottom: 1rem;">
+            <select id="bjcpSelector" class="form-control" onchange="renderBjcpExplorer()" style="font-size: 1rem; font-weight: 600;">
+                <?php foreach (get_bjcp_styles() as $sName => $sData): ?>
+                    <option value="<?= e($sName) ?>"><?= e($sName) ?> (<?= e($sData['category']) ?>)</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <div id="bjcpExplorerDetails" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1.25rem; border-radius: 8px;">
+            <!-- Rendered by JS below -->
+        </div>
+    </div>
 </div>
+
+<script>
+const BJCP_DATA = <?= json_encode(get_bjcp_styles(), JSON_UNESCAPED_SLASHES) ?>;
+
+function renderBjcpExplorer() {
+    const sel = document.getElementById('bjcpSelector');
+    const container = document.getElementById('bjcpExplorerDetails');
+    if (!sel || !container) return;
+
+    const style = BJCP_DATA[sel.value];
+    if (!style) return;
+
+    container.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h4 style="margin: 0; font-size: 1.15rem; color: #1e293b;">${sel.value}</h4>
+            <span class="badge badge-primary">${style.category}</span>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.4;">${style.description}</p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+            <div style="background: #fff; border: 1px solid #cbd5e1; padding: 0.75rem; border-radius: 6px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">OG Range</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #0f172a;">${style.og_min.toFixed(3)} – ${style.og_max.toFixed(3)}</div>
+            </div>
+            <div style="background: #fff; border: 1px solid #cbd5e1; padding: 0.75rem; border-radius: 6px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">FG Range</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #10b981;">${style.fg_min.toFixed(3)} – ${style.fg_max.toFixed(3)}</div>
+            </div>
+            <div style="background: #fff; border: 1px solid #cbd5e1; padding: 0.75rem; border-radius: 6px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">ABV Range</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #3b82f6;">${style.abv_min}% – ${style.abv_max}%</div>
+            </div>
+            <div style="background: #fff; border: 1px solid #cbd5e1; padding: 0.75rem; border-radius: 6px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">IBU Range</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">${style.ibu_min} – ${style.ibu_max}</div>
+            </div>
+            <div style="background: #fff; border: 1px solid #cbd5e1; padding: 0.75rem; border-radius: 6px; text-align: center;">
+                <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">SRM Color</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: #d97706;">${style.srm_min} – ${style.srm_max} SRM</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 1.25rem; text-align: right;">
+            <a href="recipe_edit.php?action=new&style=${encodeURIComponent(sel.value)}" class="btn btn-primary" style="font-size: 0.9rem;">📖 Formulate Recipe for this Style &raquo;</a>
+        </div>
+    `;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderBjcpExplorer();
+});
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

@@ -4,15 +4,27 @@
  * Supports Fresh Bare-Metal LAMP Installation and Seamless Version Upgrades
  */
 
-// Error reporting for setup
+// Error reporting: Suppressed in production, enabled only during initial bare-metal installation
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+$lockFile = __DIR__ . '/installed.lock';
+$isInstalled = file_exists($lockFile);
+ini_set('display_errors', $isInstalled ? 0 : 1);
 
 define('INSTALL_VERSION', '2.7.0');
-$lockFile = __DIR__ . '/installed.lock';
 $configFile = __DIR__ . '/config.php';
 $schemaFile = __DIR__ . '/schema.sql';
 $docsDir = __DIR__ . '/assets/docs/';
+
+// If application is already installed, require active Administrator session for upgrades
+if ($isInstalled) {
+    if (file_exists($configFile)) {
+        require_once $configFile;
+    }
+    require_once __DIR__ . '/db.php';
+    require_once __DIR__ . '/includes/auth_check.php';
+    require_login();
+    require_admin();
+}
 
 // 1. Check Server Prerequisites
 $reqs = [

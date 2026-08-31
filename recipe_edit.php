@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/includes/auth_check.php';
+require_once __DIR__ . '/includes/bjcp_styles.php';
 
 require_login();
 $user = current_user();
@@ -17,6 +18,7 @@ $r = [
     'name' => '',
     'style' => '',
     'batch_size_gal' => 5.0,
+    'target_pre_og' => '',
     'target_og' => '',
     'target_fg' => '',
     'target_abv' => '',
@@ -25,9 +27,7 @@ $r = [
     'is_public' => 1
 ];
 
-$ingredients = [];
-$supplies    = [];
-$steps       = [];
+$categories = $db->query("SELECT * FROM categories ORDER BY id")->fetchAll();
 
 if ($action === 'edit' && $recipeId > 0) {
     $stmt = $db->prepare("SELECT * FROM recipes WHERE id = ? AND user_id = ?");
@@ -42,9 +42,102 @@ if ($action === 'edit' && $recipeId > 0) {
     } else {
         die("Recipe not found or access denied.");
     }
-}
+} elseif ($action === 'new' && !empty($_GET['style'])) {
+    $styleParam = trim($_GET['style']);
+    $bjcp = find_bjcp_style($styleParam);
+    if ($bjcp) {
+        $r['style'] = $bjcp['name'];
+        $r['name'] = 'My ' . $bjcp['name'];
+        $r['target_og'] = sprintf('%.3f', ($bjcp['og_min'] + $bjcp['og_max']) / 2);
+        $r['target_fg'] = sprintf('%.3f', ($bjcp['fg_min'] + $bjcp['fg_max']) / 2);
+        $r['target_abv'] = sprintf('%.1f', ($bjcp['abv_min'] + $bjcp['abv_max']) / 2);
 
-$categories = $db->query("SELECT * FROM categories ORDER BY id")->fetchAll();
+        // Map Category
+        foreach ($categories as $cat) {
+            if (strcasecmp($cat['name'], $bjcp['category']) === 0 || 
+                (stripos($bjcp['category'], 'Cider') !== false && strcasecmp($cat['name'], 'Cider') === 0) ||
+                (stripos($bjcp['category'], 'Mead') !== false && strcasecmp($cat['name'], 'Mead') === 0)) {
+                $r['category_id'] = $cat['id'];
+                break;
+            }
+        }
+
+        // Preload baseline starter formulation based on beverage style
+        if (stripos($bjcp['name'], 'Cider') !== false) {
+            $r['target_pre_og'] = '1.045';
+            $ingredients = [
+                ['name' => 'Fresh Pressed Apple Cider / Juice', 'ingredient_type' => 'Fermentable', 'amount' => 5.0, 'unit' => 'Gal', 'stage_addition' => 'Primary', 'notes' => 'Preservative-free juice (no potassium sorbate)'],
+                ['name' => 'Corn Sugar / Dextrose (Optional for ABV boost)', 'ingredient_type' => 'Fermentable', 'amount' => 1.0, 'unit' => 'lbs', 'stage_addition' => 'Primary', 'notes' => 'Dissolved in warm cider if higher ABV desired'],
+                ['name' => 'Yeast Nutrient (DAP / Fermaid-O)', 'ingredient_type' => 'Additive', 'amount' => 1.0, 'unit' => 'tsp', 'stage_addition' => 'Primary', 'notes' => 'Add at pitch time'],
+                ['name' => 'Cider / Wine Yeast (SafCider or EC-1118)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Rehydrated at 90-95°F']
+            ];
+            $steps = [
+                ['phase' => 'Preparation', 'title' => 'Sanitize Fermenter & Equipment', 'duration' => '15 mins', 'target_temp' => '', 'instructions' => 'Clean and sanitize carboy, funnel, airlock, and hydrometer with Star San.'],
+                ['phase' => 'Pitching', 'title' => 'Aerate Juice & Pitch Yeast', 'duration' => '10 mins', 'target_temp' => '65°F - 68°F', 'instructions' => 'Aerate juice thoroughly, record Starting OG hydrometer reading, and pitch yeast with nutrient.'],
+                ['phase' => 'Primary', 'title' => 'Primary Fermentation', 'duration' => '14 days', 'target_temp' => '65°F', 'instructions' => 'Ferment in dark temperature-controlled area until specific gravity drops to target FG.'],
+                ['phase' => 'Bottling', 'title' => 'Bottling & Carbonation', 'duration' => '60 mins', 'target_temp' => '70°F', 'instructions' => 'Prime with corn sugar for bottle carbonation (or stabilize with sorbate/sulfite if backsweetening).']
+            ];
+        } elseif (stripos($bjcp['name'], 'Mead') !== false) {
+            $ingredients = [
+                ['name' => 'Raw Clover / Wildflower Honey', 'ingredient_type' => 'Fermentable', 'amount' => 12.0, 'unit' => 'lbs', 'stage_addition' => 'Primary', 'notes' => 'Pure unpasteurized honey'],
+                ['name' => 'Spring / Filtered Water', 'ingredient_type' => 'Water', 'amount' => 4.0, 'unit' => 'Gal', 'stage_addition' => 'Primary', 'notes' => 'Dechlorinated spring water'],
+                ['name' => 'Fermaid-O Yeast Nutrient', 'ingredient_type' => 'Additive', 'amount' => 5.0, 'unit' => 'g', 'stage_addition' => 'Primary', 'notes' => 'TOSNA staggered addition'],
+                ['name' => 'Wine / Mead Yeast (Lalvin D-47 or 71B)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Rehydrated with Go-Ferm']
+            ];
+            $steps = [
+                ['phase' => 'Preparation', 'title' => 'Mix Must & Dissolve Honey', 'duration' => '30 mins', 'target_temp' => '70°F', 'instructions' => 'Warm water to 95°F to dissolve honey into must, aerate vigorously, and record Starting OG.'],
+                ['phase' => 'Primary', 'title' => 'Pitch Yeast & Staggered Nutrients', 'duration' => '7 days', 'target_temp' => '64°F - 68°F', 'instructions' => 'Add nutrients at 24h, 48h, 72h, and 1/3 sugar break.'],
+                ['phase' => 'Secondary', 'title' => 'Secondary Racking & Bulk Aging', 'duration' => '60 days', 'target_temp' => '60°F - 65°F', 'instructions' => 'Rack off yeast lees once clear and allow to age and mellow.']
+            ];
+        } elseif (stripos($bjcp['name'], 'Stout') !== false || stripos($bjcp['name'], 'Porter') !== false) {
+            $ingredients = [
+                ['name' => 'Pale 2-Row / Maris Otter Malt', 'ingredient_type' => 'Fermentable', 'amount' => 9.0, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Base malt (75%)'],
+                ['name' => 'Roasted Barley (300L)', 'ingredient_type' => 'Fermentable', 'amount' => 1.0, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Provides dry coffee roast character'],
+                ['name' => 'Chocolate Malt (350L)', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds dark chocolate notes'],
+                ['name' => 'Flaked Barley / Oats', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Enhances body and creamy head retention'],
+                ['name' => 'East Kent Goldings / Fuggle Hops', 'ingredient_type' => 'Hop', 'amount' => 1.5, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '60 min bittering addition (~35 IBU)'],
+                ['name' => 'English Ale Yeast (WLP004 / S-04)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Pitch at 66°F']
+            ];
+            $steps = [
+                ['phase' => 'Mash/Steep', 'title' => 'Mash-In at 154°F', 'duration' => '60 mins', 'target_temp' => '154°F', 'instructions' => 'Strike grains with 3.75 gal of water at 165°F to achieve 154°F mash rest.'],
+                ['phase' => 'Boil', 'title' => '60-Minute Boil & Bittering Addition', 'duration' => '60 mins', 'target_temp' => '212°F', 'instructions' => 'Bring wort to rolling boil and add 1.5 oz hops at 60 mins.'],
+                ['phase' => 'Pitching', 'title' => 'Chill Wort & Inoculate Yeast', 'duration' => '20 mins', 'target_temp' => '66°F', 'instructions' => 'Rapidly chill to 66°F, aerate with oxygen/shaking, and pitch English ale yeast.'],
+                ['phase' => 'Primary', 'title' => 'Primary Fermentation', 'duration' => '10 days', 'target_temp' => '66°F - 68°F', 'instructions' => 'Ferment until specific gravity reaches final gravity.']
+            ];
+        } elseif (stripos($bjcp['name'], 'IPA') !== false || stripos($bjcp['name'], 'Pale Ale') !== false) {
+            $ingredients = [
+                ['name' => 'American 2-Row Pale Malt', 'ingredient_type' => 'Fermentable', 'amount' => 10.5, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Base grain (85%)'],
+                ['name' => 'Crystal / Caramel 40L Malt', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds subtle sweetness and amber hue'],
+                ['name' => 'Munich Malt 10L', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds malt backbone to balance hops'],
+                ['name' => 'Centennial / Cascade Hops (Bittering)', 'ingredient_type' => 'Hop', 'amount' => 1.0, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '60 min bittering addition (~35 IBU)'],
+                ['name' => 'Citra / Mosaic Hops (Flavor/Aroma)', 'ingredient_type' => 'Hop', 'amount' => 1.5, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '10 min / Flameout addition (~20 IBU)'],
+                ['name' => 'Citra / Mosaic Hops (Dry Hop)', 'ingredient_type' => 'Hop', 'amount' => 2.0, 'unit' => 'oz', 'stage_addition' => 'Secondary', 'notes' => 'Dry hop for 4 days before packaging'],
+                ['name' => 'American Ale Yeast (US-05 / WLP001)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Clean neutral fermentation']
+            ];
+            $steps = [
+                ['phase' => 'Mash/Steep', 'title' => 'Single Infusion Mash at 152°F', 'duration' => '60 mins', 'target_temp' => '152°F', 'instructions' => 'Strike grains with 4.0 gal of strike water at 163°F to achieve 152°F rest.'],
+                ['phase' => 'Boil', 'title' => '60-Minute Boil & Hop Schedule', 'duration' => '60 mins', 'target_temp' => '212°F', 'instructions' => 'Add 1.0 oz bittering hops at 60 mins, 1.5 oz aroma hops at flameout/whirlpool.'],
+                ['phase' => 'Pitching', 'title' => 'Chill Wort & Pitch Yeast', 'duration' => '20 mins', 'target_temp' => '67°F', 'instructions' => 'Chill to 67°F, oxygenate wort, and pitch American ale yeast.'],
+                ['phase' => 'Primary', 'title' => 'Primary Fermentation & Dry Hop', 'duration' => '10 days', 'target_temp' => '67°F - 69°F', 'instructions' => 'Add dry hops on day 7 for 3-4 days before packaging.']
+            ];
+        } else {
+            // German / Pilsner / Belgian / Wheat / Craft Ale generic baseline
+            $ingredients = [
+                ['name' => 'Pilsner / Pale 2-Row Malt', 'ingredient_type' => 'Fermentable', 'amount' => 9.5, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Base grain'],
+                ['name' => 'Vienna / Munich Malt', 'ingredient_type' => 'Fermentable', 'amount' => 1.0, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Malt complexity'],
+                ['name' => 'Hallertau / Saaz Hops', 'ingredient_type' => 'Hop', 'amount' => 1.25, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '60 min bittering'],
+                ['name' => 'Hallertau / Saaz Hops', 'ingredient_type' => 'Hop', 'amount' => 0.75, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '15 min aroma addition'],
+                ['name' => 'Style Appropriate Yeast', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Ferment within style temperature range']
+            ];
+            $steps = [
+                ['phase' => 'Mash/Steep', 'title' => 'Mash Rest at 150-153°F', 'duration' => '60 mins', 'target_temp' => '152°F', 'instructions' => 'Mash grains in hot water for saccharification rest.'],
+                ['phase' => 'Boil', 'title' => '60-Minute Boil Schedule', 'duration' => '60 mins', 'target_temp' => '212°F', 'instructions' => 'Boil wort and add hops per schedule.'],
+                ['phase' => 'Pitching', 'title' => 'Chill & Pitch Yeast', 'duration' => '20 mins', 'target_temp' => '65°F', 'instructions' => 'Chill wort to pitching temperature and pitch yeast.'],
+                ['phase' => 'Primary', 'title' => 'Fermentation Schedule', 'duration' => '14 days', 'target_temp' => '65°F - 68°F', 'instructions' => 'Maintain steady fermentation temperature.']
+            ];
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf_token();
@@ -53,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name         = sanitize_text($_POST['name'] ?? '', 100);
     $style        = sanitize_text($_POST['style'] ?? '', 100);
     $batchSize    = validate_batch_size($_POST['batch_size_gal'] ?? 5.0, 5.0);
+    $targetPreOg  = validate_gravity($_POST['target_pre_og'] ?? null);
     $targetOg     = validate_gravity($_POST['target_og'] ?? null);
     $targetFg     = validate_gravity($_POST['target_fg'] ?? null);
     $instructions = sanitize_text($_POST['instructions'] ?? '', 5000);
@@ -129,13 +223,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $up = $db->prepare("
                 UPDATE recipes SET
                     category_id = ?, name = ?, style = ?, batch_size_gal = ?,
-                    target_og = ?, target_fg = ?, target_abv = ?, ingredients = ?,
+                    target_pre_og = ?, target_og = ?, target_fg = ?, target_abv = ?, ingredients = ?,
                     instructions = ?, is_public = ?
                 WHERE id = ? AND user_id = ?
             ");
             $up->execute([
                 $catId, $name, $style, $batchSize,
-                $targetOg, $targetFg, $targetAbv, $ingredientsTextSummary,
+                $targetPreOg, $targetOg, $targetFg, $targetAbv, $ingredientsTextSummary,
                 $instructions, $isPublic, $r['id'], $user['id']
             ]);
             $targetRecipeId = $r['id'];
@@ -143,15 +237,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ins = $db->prepare("
                 INSERT INTO recipes (
                     user_id, category_id, name, style, batch_size_gal,
-                    target_og, target_fg, target_abv, ingredients, instructions, is_public
+                    target_pre_og, target_og, target_fg, target_abv, ingredients, instructions, is_public
                 ) VALUES (
                     ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?
                 )
             ");
             $ins->execute([
                 $user['id'], $catId, $name, $style, $batchSize,
-                $targetOg, $targetFg, $targetAbv, $ingredientsTextSummary, $instructions, $isPublic
+                $targetPreOg, $targetOg, $targetFg, $targetAbv, $ingredientsTextSummary, $instructions, $isPublic
             ]);
             $targetRecipeId = $db->lastInsertId();
         }
@@ -205,8 +299,13 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="form-row">
                 <div class="form-group">
-                    <label class="form-label">Brew Style</label>
-                    <input type="text" name="style" class="form-control" value="<?= e($r['style']) ?>" placeholder="e.g. Dry Cider, Imperial IPA, Merlot">
+                    <label class="form-label">Brew Style (BJCP)</label>
+                    <input type="text" name="style" id="recipe_style_input" list="bjcpStylesList" class="form-control" value="<?= e($r['style']) ?>" placeholder="Select or type BJCP Style (e.g. American IPA, Dry Stout)">
+                    <datalist id="bjcpStylesList">
+                        <?php foreach (get_bjcp_styles() as $sName => $sData): ?>
+                            <option value="<?= e($sName) ?>"><?= e($sData['category']) ?></option>
+                        <?php endforeach; ?>
+                    </datalist>
                 </div>
 
                 <div class="form-group">
@@ -215,31 +314,59 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div class="form-row">
+            <div class="form-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                 <div class="form-group">
-                    <label class="form-label">Target OG</label>
-                    <input type="number" step="0.001" id="calc_og" name="target_og" class="form-control" value="<?= e($r['target_og']) ?>" placeholder="1.055">
+                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>Base Juice / Must OG</span>
+                        <small style="color: var(--text-muted); font-weight: normal;">(Pre-Sugar/Optional)</small>
+                    </label>
+                    <input type="number" step="0.001" id="calc_pre_og" name="target_pre_og" class="form-control" value="<?= e($r['target_pre_og'] ?? '') ?>" placeholder="e.g. 1.045 (Raw Juice)">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">For wine/cider: Initial fresh pressed juice gravity before adding sugar.</small>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Target FG</label>
-                    <input type="number" step="0.001" id="calc_fg" name="target_fg" class="form-control" value="<?= e($r['target_fg']) ?>" placeholder="1.010">
+                    <label class="form-label" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>Target Starting OG</span>
+                        <small style="color: var(--text-muted); font-weight: normal;">(Post-Sugar/Inoculated)</small>
+                    </label>
+                    <input type="number" step="0.001" id="calc_og" name="target_og" class="form-control" value="<?= e($r['target_og']) ?>" placeholder="e.g. 1.085 (Adjusted Must)">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">Starting OG when fermentation begins.</small>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Estimated ABV</label>
+                    <label class="form-label">Target FG (Final)</label>
+                    <input type="number" step="0.001" id="calc_fg" name="target_fg" class="form-control" value="<?= e($r['target_fg']) ?>" placeholder="e.g. 0.998">
+                    <small style="color: var(--text-muted); font-size: 0.78rem; display: block; margin-top: 0.25rem;">Expected final finished gravity.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Estimated Total ABV</label>
                     <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color); padding: 0.4rem 0;" id="calc_abv_result">
                         <?= $r['target_abv'] ? e($r['target_abv']) . '%' : '--%' ?>
                     </div>
+                    <small id="chaptalization_badge" style="color: #b45309; font-size: 0.8rem; font-weight: 700; display: none;"></small>
                 </div>
+            </div>
+
+            <!-- Dynamic BJCP Target Gauges Preview Block -->
+            <div id="bjcpTargetPreviewBox" style="display: none; background: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #d97706; padding: 1rem 1.25rem; border-radius: 8px; margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong style="font-size: 0.95rem; color: #1e293b;">🎯 BJCP Style Target Compliance (<span id="bjcpStyleDisplayName">--</span>)</strong>
+                    <span class="badge badge-warning" id="bjcpCategoryBadge">--</span>
+                </div>
+                <p id="bjcpStyleDesc" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;"></p>
+                <div id="bjcpGaugesContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem;"></div>
             </div>
 
             <hr style="margin: 2rem 0; border: none; border-top: 1px solid #e2e8f0;">
 
             <!-- 🌾 Structured Ingredients Section -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="font-size: 1.25rem;">🌾 1. Recipe Ingredients Breakdown</h3>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="addIngredientRow()">+ Add Ingredient</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <h3 style="font-size: 1.25rem; margin: 0;">🌾 1. Recipe Ingredients Breakdown</h3>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="quickScaleIngredients()" title="Scale ingredient amounts by factor">⚖️ Scale Quantities</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="addIngredientRow()">+ Add Ingredient</button>
+                </div>
             </div>
 
             <div style="display: flex; gap: 1rem; align-items: center; background: #f8fafc; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 1rem; flex-wrap: wrap;">
@@ -715,12 +842,137 @@ function updateLiveIbuSrm() {
     }
 }
 
+const BJCP_DB = <?= json_encode(get_bjcp_styles(), JSON_UNESCAPED_SLASHES) ?>;
+
+function findBjcpStyleData(name) {
+    if (!name) return null;
+    const clean = name.trim().toLowerCase();
+    for (let key in BJCP_DB) {
+        if (key.toLowerCase() === clean) return { name: key, ...BJCP_DB[key] };
+    }
+    for (let key in BJCP_DB) {
+        if (key.toLowerCase().includes(clean) || clean.includes(key.toLowerCase())) {
+            return { name: key, ...BJCP_DB[key] };
+        }
+    }
+    return null;
+}
+
+function renderJsTargetGauge(label, actual, min, max, unit = '', decimals = 3) {
+    let statusClass = 'badge-secondary';
+    let statusText = 'Not Set';
+    let markerPct = 50;
+
+    const span = Math.max(0.001, max - min);
+    const viewMin = min - (span * 0.25);
+    const viewMax = max + (span * 0.25);
+    const viewSpan = Math.max(0.001, viewMax - viewMin);
+
+    const rangeStartPct = Math.round(((min - viewMin) / viewSpan) * 100);
+    const rangeWidthPct = Math.round((span / viewSpan) * 100);
+
+    let markerHtml = '';
+    if (actual !== null && !isNaN(actual) && actual > 0) {
+        markerPct = Math.max(2, Math.min(98, Math.round(((actual - viewMin) / viewSpan) * 100)));
+        if (actual >= min && actual <= max) {
+            statusClass = 'badge-success';
+            statusText = '✓ In Style';
+        } else if (actual < min) {
+            statusClass = 'badge-warning';
+            statusText = '▼ Low (' + actual.toFixed(decimals) + ')';
+        } else {
+            statusClass = 'badge-danger';
+            statusText = '▲ High (' + actual.toFixed(decimals) + ')';
+        }
+        markerHtml = `<div style="position: absolute; left: ${markerPct}%; top: -3px; width: 6px; height: 18px; background: #0f172a; border: 1px solid #fff; border-radius: 3px; transform: translateX(-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.3);" title="Your Value: ${actual.toFixed(decimals)}"></div>`;
+    }
+
+    return `
+        <div style="background: #ffffff; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; font-size: 0.8rem;">
+                <strong>${label}</strong>
+                <div>
+                    <span style="color: #64748b; font-size: 0.75rem; margin-right: 0.4rem;">${min.toFixed(decimals)} - ${max.toFixed(decimals)} ${unit}</span>
+                    <span class="badge ${statusClass}">${statusText}</span>
+                </div>
+            </div>
+            <div style="position: relative; height: 12px; background: #e2e8f0; border-radius: 6px;">
+                <div style="position: absolute; left: ${rangeStartPct}%; width: ${rangeWidthPct}%; height: 100%; background: #10b981; opacity: 0.75; border-radius: 4px;"></div>
+                ${markerHtml}
+            </div>
+        </div>
+    `;
+}
+
+function updateBjcpStylePreview() {
+    const styleInput = document.getElementById('recipe_style_input');
+    const previewBox = document.getElementById('bjcpTargetPreviewBox');
+    if (!styleInput || !previewBox) return;
+
+    const styleData = findBjcpStyleData(styleInput.value);
+    if (!styleData) {
+        previewBox.style.display = 'none';
+        return;
+    }
+
+    previewBox.style.display = 'block';
+    document.getElementById('bjcpStyleDisplayName').textContent = styleData.name;
+    document.getElementById('bjcpCategoryBadge').textContent = styleData.category;
+    document.getElementById('bjcpStyleDesc').textContent = styleData.description;
+
+    const og = parseFloat(document.getElementById('calc_og')?.value) || null;
+    const fg = parseFloat(document.getElementById('calc_fg')?.value) || null;
+    const abv = (og && fg && og > fg) ? parseFloat(((og - fg) * 131.25).toFixed(1)) : null;
+
+    let gaugesHtml = '';
+    gaugesHtml += renderJsTargetGauge('Original Gravity (OG)', og, styleData.og_min, styleData.og_max, '', 3);
+    gaugesHtml += renderJsTargetGauge('Final Gravity (FG)', fg, styleData.fg_min, styleData.fg_max, '', 3);
+    gaugesHtml += renderJsTargetGauge('Estimated ABV', abv, styleData.abv_min, styleData.abv_max, '%', 1);
+
+    document.getElementById('bjcpGaugesContainer').innerHTML = gaugesHtml;
+}
+
+function quickScaleIngredients() {
+    const batchInput = document.querySelector('input[name="batch_size_gal"]');
+    const curSize = parseFloat(batchInput?.value) || 5.0;
+    const targetPrompt = prompt(`Scale ingredients for a new batch volume?\nCurrent Batch Size: ${curSize} Gal\nEnter new target volume (Gal):`, curSize.toString());
+    
+    if (!targetPrompt) return;
+    const targetSize = parseFloat(targetPrompt);
+    if (isNaN(targetSize) || targetSize <= 0) {
+        alert('Please enter a valid positive number for the target batch size.');
+        return;
+    }
+
+    const factor = targetSize / curSize;
+    if (Math.abs(factor - 1.0) < 0.001) return;
+
+    const amounts = document.querySelectorAll('input[name="ing_amount[]"]');
+    amounts.forEach(inp => {
+        const val = parseFloat(inp.value);
+        if (!isNaN(val) && val > 0) {
+            inp.value = Math.round((val * factor) * 100) / 100;
+        }
+    });
+
+    if (batchInput) batchInput.value = targetSize;
+    updateLiveIbuSrm();
+    alert(`✅ Scaled ${amounts.length} ingredient quantities by factor of ${factor.toFixed(2)}x (to ${targetSize} Gal).`);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.auto-resize-inst').forEach(el => autoResizeInst(el));
     updateLiveIbuSrm();
+    updateBjcpStylePreview();
 });
-document.addEventListener('input', updateLiveIbuSrm);
-document.addEventListener('change', updateLiveIbuSrm);
+document.addEventListener('input', () => {
+    updateLiveIbuSrm();
+    updateBjcpStylePreview();
+});
+document.addEventListener('change', () => {
+    updateLiveIbuSrm();
+    updateBjcpStylePreview();
+});
 </script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

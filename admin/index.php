@@ -158,6 +158,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h3 class="card-title" style="margin-bottom: 1rem;">⚡ Quick Admin Actions</h3>
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
             <a href="users.php" class="btn btn-primary" style="text-align: left;">👥 Manage Users &amp; Passwords</a>
+            <a href="transfer.php" class="btn btn-secondary" style="text-align: left;">🔄 Migrate / Copy Records Between Users</a>
             <a href="backup.php" class="btn btn-secondary" style="text-align: left;">💾 Download Full Database Backup (.sql)</a>
             <a href="security.php" class="btn btn-secondary" style="text-align: left;">🛡️ IP Blocklist &amp; Security Logs</a>
             <a href="analytics.php" class="btn btn-secondary" style="text-align: left;">📈 Brewing Demographics &amp; Analytics</a>

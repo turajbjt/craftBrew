@@ -86,6 +86,16 @@ function run_migrations($db = null) {
     } catch (Exception $e) {}
 
     try {
+        $db->exec("ALTER TABLE batches ADD COLUMN gravity_pre_og DECIMAL(4,3) DEFAULT NULL AFTER ferment_temp_f");
+        $logs[] = "Verified column: batches.gravity_pre_og";
+    } catch (Exception $e) {}
+
+    try {
+        $db->exec("ALTER TABLE recipes ADD COLUMN target_pre_og DECIMAL(4,3) DEFAULT NULL AFTER batch_size_gal");
+        $logs[] = "Verified column: recipes.target_pre_og";
+    } catch (Exception $e) {}
+
+    try {
         $db->exec("ALTER TABLE batches ADD COLUMN gravity_tertiary DECIMAL(4,3) DEFAULT NULL AFTER gravity_sg");
         $logs[] = "Verified column: batches.gravity_tertiary";
     } catch (Exception $e) {}

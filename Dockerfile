@@ -1,8 +1,8 @@
 FROM php:8.2-apache
 
-# Install PDO MySQL, OpenSSL, and required PHP extensions
-RUN apt-get update && apt-get install -y openssl ssl-cert libpng-dev libjpeg-dev libfreetype6-dev \
-    && docker-php-ext-install pdo pdo_mysql mysqli \
+# Install PDO MySQL, OpenSSL, libzip, and required PHP extensions
+RUN apt-get update && apt-get install -y openssl ssl-cert libpng-dev libjpeg-dev libfreetype6-dev libzip-dev zip unzip \
+    && docker-php-ext-install pdo pdo_mysql mysqli zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Enable Apache mod_rewrite, mod_headers, and mod_ssl

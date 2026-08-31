@@ -166,7 +166,9 @@ body {
 .badge-cider { background: #ecfccb; color: #365314; }
 .badge-primary { background: #dbeafe; color: #1e40af; }
 .badge-secondary { background: #e0e7ff; color: #3730a3; }
-.badge-bottled { background: #fef3c7; color: #78350f; }
+.badge-planning { background: #f1f5f9; color: #475569; }
+.badge-mustprep { background: #fae8ff; color: #86198f; }
+.badge-bottled, .badge-bottlingaging { background: #fef3c7; color: #78350f; }
 .badge-completed { background: #dcfce7; color: #166534; }
 
 /* Buttons */
@@ -344,3 +346,193 @@ footer a {
         display: flex;
     }
 }
+
+/* Splash Page Styling */
+.splash-hero {
+    background: linear-gradient(135deg, #1c1917 0%, #292524 50%, #451a03 100%);
+    color: #ffffff;
+    border-radius: 16px;
+    padding: 3.5rem 2rem;
+    text-align: center;
+    margin-bottom: 2.5rem;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.splash-hero::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.splash-hero-badge {
+    display: inline-block;
+    background: rgba(245, 158, 11, 0.2);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
+    padding: 0.35rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+}
+
+.splash-hero h1 {
+    font-size: 2.75rem;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+    color: #ffffff;
+}
+
+.splash-hero h1 span {
+    color: #fbbf24;
+}
+
+.splash-hero p {
+    font-size: 1.15rem;
+    max-width: 720px;
+    margin: 0 auto 2rem;
+    color: #d6d3d1;
+    line-height: 1.7;
+}
+
+.splash-cta-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-lg {
+    padding: 0.85rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 10px;
+}
+
+.btn-outline-light {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+}
+
+.btn-outline-light:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #ffffff;
+    color: #ffffff;
+}
+
+.splash-section-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.splash-section-header h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.splash-section-header p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.splash-feature-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1.75rem;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+}
+
+.splash-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1);
+    border-color: #fbbf24;
+}
+
+.splash-feature-icon {
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
+    display: inline-block;
+}
+
+.splash-feature-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text-dark);
+}
+
+.splash-feature-desc {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    flex: 1;
+}
+
+.splash-beverage-pills {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 2rem 0 3rem;
+}
+
+.beverage-pill {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.splash-bottom-banner {
+    background: linear-gradient(135deg, #262626 0%, #171717 100%);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin: 3rem 0 2rem;
+    border-left: 6px solid var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .splash-hero {
+        padding: 2.5rem 1.25rem;
+    }
+    .splash-hero h1 {
+        font-size: 2rem;
+    }
+    .splash-bottom-banner {
+        text-align: center;
+        justify-content: center;
+    }
+}
+
