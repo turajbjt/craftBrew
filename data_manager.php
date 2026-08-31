@@ -716,7 +716,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     sanitize_text($b['boil_notes'] ?? '', 5000),
                                     sanitize_text($b['reflections'] ?? '', 5000),
                                     validate_rating($b['rating'] ?? 0),
-                                    validate_enum($b['status'] ?? 'Primary', ['Planning', 'Primary', 'Secondary', 'Bottling/Aging', 'Completed'], 'Primary')
+                                    validate_enum($b['status'] ?? 'Primary', ['Planning', 'Must Prep', 'Primary', 'Secondary', 'Bottling/Aging', 'Completed'], 'Primary')
                                 ]);
                                 $newBId = (int)$db->lastInsertId();
                                 $stats['batches']++;
