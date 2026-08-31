@@ -67,17 +67,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
                     // Save structured steps
                     if (!empty($data['steps']) && is_array($data['steps'])) {
-                        $stepIns = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $hasStepName = false;
+                        try {
+                            $cChk = $db->query("SHOW COLUMNS FROM recipe_steps LIKE 'step_name'");
+                            $hasStepName = $cChk && $cChk->fetch();
+                        } catch (Throwable $e) {}
+
+                        if ($hasStepName) {
+                            $stepIns = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions, step_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        } else {
+                            $stepIns = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        }
+
                         foreach ($data['steps'] as $idx => $st) {
-                            $stepIns->execute([
+                            $stTitle = sanitize_text($st['title'] ?? ($st['step_name'] ?? 'Step'), 150);
+                            $stParams = [
                                 $newRecipeId,
                                 $idx + 1,
                                 sanitize_text($st['phase'] ?? 'Brew Day', 50),
-                                sanitize_text($st['title'] ?? ($st['step_name'] ?? 'Step'), 150),
+                                $stTitle,
                                 sanitize_text($st['duration'] ?? ($st['duration_minutes'] ?? ''), 50),
                                 sanitize_text($st['target_temp'] ?? ($st['target_temp_f'] ?? ''), 30),
                                 sanitize_text($st['instructions'] ?? ($st['description'] ?? ''), 2000)
-                            ]);
+                            ];
+                            if ($hasStepName) {
+                                $stParams[] = $stTitle;
+                            }
+                            $stepIns->execute($stParams);
                         }
                     }
 

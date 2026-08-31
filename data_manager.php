@@ -543,10 +543,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 INSERT INTO recipe_supplies (recipe_id, item_name, category, quantity, is_required, notes) 
                                 VALUES (?, ?, ?, ?, ?, ?)
                             ");
-                            $insStp = $db->prepare("
-                                INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) 
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
-                            ");
+                            $hasStepName = false;
+                            try {
+                                $cChk = $db->query("SHOW COLUMNS FROM recipe_steps LIKE 'step_name'");
+                                $hasStepName = $cChk && $cChk->fetch();
+                            } catch (Throwable $e) {}
+
+                            if ($hasStepName) {
+                                $insStp = $db->prepare("
+                                    INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions, step_name) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                ");
+                            } else {
+                                $insStp = $db->prepare("
+                                    INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                ");
+                            }
 
                             foreach ($data['recipes'] as $r) {
                                 if (!is_array($r)) continue;
@@ -626,15 +639,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                     $stepCount = 0;
                                     foreach ($r['steps'] as $idx => $st) {
                                         if (!is_array($st) || $stepCount++ >= 50) break;
-                                        $insStp->execute([
+                                        $stTitle = sanitize_text($st['title'] ?? ($st['step_name'] ?? 'Step'), 150);
+                                        $stParams = [
                                             $newRId,
                                             sanitize_int($st['step_number'] ?? ($idx + 1)),
                                             sanitize_text($st['phase'] ?? 'Brew Day', 50),
-                                            sanitize_text($st['title'] ?? ($st['step_name'] ?? 'Step'), 150),
+                                            $stTitle,
                                             sanitize_text($st['duration'] ?? ($st['duration_minutes'] ?? ''), 50),
                                             sanitize_text($st['target_temp'] ?? ($st['target_temp_f'] ?? ''), 30),
                                             sanitize_text($st['instructions'] ?? ($st['description'] ?? ''), 2000)
-                                        ]);
+                                        ];
+                                        if ($hasStepName) {
+                                            $stParams[] = $stTitle;
+                                        }
+                                        $insStp->execute($stParams);
                                         $stats['steps']++;
                                     }
                                 }

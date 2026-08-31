@@ -331,6 +331,20 @@ function run_migrations($db = null) {
         }
     }
 
+    // Relax legacy NOT NULL constraints on legacy columns
+    try {
+        $db->exec("ALTER TABLE recipe_steps MODIFY COLUMN step_name VARCHAR(100) NULL DEFAULT ''");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("ALTER TABLE recipe_steps MODIFY COLUMN target_temp_f VARCHAR(10) NULL DEFAULT ''");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("ALTER TABLE recipe_steps MODIFY COLUMN duration_minutes INT NULL DEFAULT 0");
+    } catch (Throwable $e) {}
+    try {
+        $db->exec("ALTER TABLE recipe_steps MODIFY COLUMN description TEXT NULL");
+    } catch (Throwable $e) {}
+
     // Backfill legacy column data if present
     try {
         $db->exec("UPDATE recipe_steps SET title = step_name WHERE (title IS NULL OR title = '') AND step_name IS NOT NULL");
@@ -504,20 +518,35 @@ function save_recipe_details($recipeId, $ingredients = [], $supplies = [], $step
 
     // Save Steps
     if (!empty($steps)) {
-        $insStp = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $hasStepName = false;
+        try {
+            $cChk = $db->query("SHOW COLUMNS FROM recipe_steps LIKE 'step_name'");
+            $hasStepName = $cChk && $cChk->fetch();
+        } catch (Throwable $e) {}
+
+        if ($hasStepName) {
+            $insStp = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions, step_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        } else {
+            $insStp = $db->prepare("INSERT INTO recipe_steps (recipe_id, step_number, phase, title, duration, target_temp, instructions) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        }
+
         $num = 1;
         foreach ($steps as $stp) {
-            $title = trim($stp['title'] ?? '');
+            $title = trim($stp['title'] ?? ($stp['step_name'] ?? ''));
             if (!empty($title)) {
-                $insStp->execute([
+                $params = [
                     $recipeId,
                     $num++,
                     $stp['phase'] ?? 'Brew Day',
                     $title,
-                    trim($stp['duration'] ?? ''),
-                    trim($stp['target_temp'] ?? ''),
-                    trim($stp['instructions'] ?? '')
-                ]);
+                    trim($stp['duration'] ?? ($stp['duration_minutes'] ?? '')),
+                    trim($stp['target_temp'] ?? ($stp['target_temp_f'] ?? '')),
+                    trim($stp['instructions'] ?? ($stp['description'] ?? ''))
+                ];
+                if ($hasStepName) {
+                    $params[] = $title;
+                }
+                $insStp->execute($params);
             }
         }
     }
