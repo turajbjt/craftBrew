@@ -19,6 +19,10 @@
     padding: 0;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: #f1f5f9;
@@ -129,12 +133,42 @@ body {
     padding: 1.5rem;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
     border: 1px solid var(--border-color);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
 .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+a.card, .card-clickable {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    cursor: pointer;
+    position: relative;
+}
+
+a.card:hover, .card-clickable:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 20px -3px rgba(0, 0, 0, 0.12);
+}
+
+.stat-card-arrow {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    font-size: 1rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    transition: opacity 0.2s, transform 0.2s, color 0.2s;
+}
+
+a.card:hover .stat-card-arrow {
+    opacity: 1;
+    transform: translate(2px, -2px);
+    color: var(--primary-color);
 }
 
 .card-title {

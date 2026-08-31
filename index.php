@@ -209,32 +209,36 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<!-- Stats Row -->
+<!-- Stats Row (Clickable Section Jump Cards) -->
 <div class="card-grid">
-    <div class="card">
+    <a href="#active-fermentations" class="card" title="Jump to Active Fermentations section">
+        <span class="stat-card-arrow">↓</span>
         <div class="card-subtitle">Active Fermentations</div>
         <div style="font-size: 2rem; font-weight: 800; color: var(--primary-color);"><?= $activeBatches ?></div>
-        <small style="color: var(--text-muted);">In primary, secondary or aging</small>
-    </div>
-    <div class="card">
+        <small style="color: var(--text-muted);">In must prep, primary, secondary or aging &bull; Jump to section &darr;</small>
+    </a>
+    <a href="batches.php" class="card" title="Open All Brew Logs &amp; Batches">
+        <span class="stat-card-arrow">↗</span>
         <div class="card-subtitle">Total Brew Logs</div>
         <div style="font-size: 2rem; font-weight: 800; color: #1e293b;"><?= $totalBatches ?></div>
-        <small style="color: var(--text-muted);">Recorded brew batches</small>
-    </div>
-    <div class="card">
+        <small style="color: var(--text-muted);">Recorded brew batches &bull; View all &raquo;</small>
+    </a>
+    <a href="recipes.php" class="card" title="Open Recipe Formulations Library">
+        <span class="stat-card-arrow">↗</span>
         <div class="card-subtitle">Saved Recipes</div>
         <div style="font-size: 2rem; font-weight: 800; color: #3b82f6;"><?= $totalRecipes ?></div>
-        <small style="color: var(--text-muted);">Beer, Wine & Cider formulas</small>
-    </div>
-    <div class="card">
+        <small style="color: var(--text-muted);">Beer, Wine &amp; Cider formulas &bull; View all &raquo;</small>
+    </a>
+    <a href="documents.php" class="card" title="Open Reference Document Library">
+        <span class="stat-card-arrow">↗</span>
         <div class="card-subtitle">Reference Library</div>
         <div style="font-size: 2rem; font-weight: 800; color: #10b981;"><?= $totalDocs ?></div>
-        <small style="color: var(--text-muted);">Imported PDFs & brewing guides</small>
-    </div>
+        <small style="color: var(--text-muted);">Imported PDFs &amp; brewing guides &bull; View all &raquo;</small>
+    </a>
 </div>
 
 <!-- Active Fermentations Section -->
-<div style="margin-bottom: 2.5rem;">
+<div id="active-fermentations" style="margin-bottom: 2.5rem; scroll-margin-top: 1.5rem;">
     <h2>🔥 Active Fermentations</h2>
     <?php if (empty($activeList)): ?>
         <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
