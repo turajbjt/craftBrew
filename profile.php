@@ -350,9 +350,10 @@ require_once __DIR__ . '/includes/header.php';
         <div style="display: flex; gap: 0.5rem;">
             <input type="text" id="apiTokenField" class="form-control" value="<?= e($user['api_token']) ?>" readonly style="font-family: monospace; font-size: 0.85rem; background: var(--bg);">
             <button type="button" class="btn btn-secondary" onclick="copyApiToken()">📋 Copy</button>
+            <a href="api/v1/index.php?route=docs" target="_blank" class="btn btn-primary" style="white-space: nowrap;">📖 API Explorer &amp; Docs</a>
         </div>
         <small style="color: var(--text-muted); display: block; margin-top: 0.35rem;">
-            REST Endpoint: <code><?= (defined('APP_URL') ? APP_URL : '') ?>/api/v1/</code>
+            REST Gateway: <code><?= (defined('APP_URL') ? APP_URL : '') ?>/api/v1/</code> &bull; Supports Mobile Companion Apps, IoT Hydrometers (Tilt, iSpindel, Rapt Pill), and Home Automation.
         </small>
     </div>
 

@@ -358,3 +358,107 @@ function render_bjcp_target_gauge($metricLabel, $actualValue, $minVal, $maxVal, 
     <?php
     return ob_get_clean();
 }
+
+/**
+ * Get BJCP style data or null if not found
+ */
+function get_bjcp_style_data($styleName) {
+    return find_bjcp_style($styleName);
+}
+
+/**
+ * Generate starter formulation recipe payload for a given BJCP style
+ */
+function generate_recipe_starter_data($styleName) {
+    $bjcp = find_bjcp_style($styleName);
+    if (!$bjcp) return null;
+
+    $targetOg  = round(($bjcp['og_min'] + $bjcp['og_max']) / 2, 3);
+    $targetFg  = round(($bjcp['fg_min'] + $bjcp['fg_max']) / 2, 3);
+    $targetAbv = round(($bjcp['abv_min'] + $bjcp['abv_max']) / 2, 1);
+    $targetPreOg = null;
+
+    $categoryName = $bjcp['category'];
+    if (stripos($bjcp['name'], 'Cider') !== false) {
+        $categoryName = 'Cider';
+        $targetPreOg = 1.045;
+        $ingredients = [
+            ['name' => 'Fresh Pressed Apple Cider / Juice', 'ingredient_type' => 'Fermentable', 'amount' => 5.0, 'unit' => 'Gal', 'stage_addition' => 'Primary', 'notes' => 'Preservative-free juice (no potassium sorbate)'],
+            ['name' => 'Corn Sugar / Dextrose (Optional for ABV boost)', 'ingredient_type' => 'Fermentable', 'amount' => 1.0, 'unit' => 'lbs', 'stage_addition' => 'Primary', 'notes' => 'Dissolved in warm cider if higher ABV desired'],
+            ['name' => 'Yeast Nutrient (DAP / Fermaid-O)', 'ingredient_type' => 'Additive', 'amount' => 1.0, 'unit' => 'tsp', 'stage_addition' => 'Primary', 'notes' => 'Add at pitch time'],
+            ['name' => 'Cider / Wine Yeast (SafCider or EC-1118)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Rehydrated at 90-95°F']
+        ];
+        $steps = [
+            ['step_number' => 1, 'phase' => 'Preparation', 'title' => 'Sanitize Fermenter & Equipment', 'duration' => '15 mins', 'target_temp' => '', 'instructions' => 'Clean and sanitize carboy, funnel, airlock, and hydrometer with Star San.'],
+            ['step_number' => 2, 'phase' => 'Pitching', 'title' => 'Aerate Juice & Pitch Yeast', 'duration' => '10 mins', 'target_temp' => '65°F - 68°F', 'instructions' => 'Aerate juice thoroughly, record Starting OG hydrometer reading, and pitch yeast with nutrient.'],
+            ['step_number' => 3, 'phase' => 'Primary', 'title' => 'Primary Fermentation', 'duration' => '14 days', 'target_temp' => '65°F', 'instructions' => 'Ferment in dark temperature-controlled area until specific gravity drops to target FG.'],
+            ['step_number' => 4, 'phase' => 'Bottling', 'title' => 'Bottling & Carbonation', 'duration' => '60 mins', 'target_temp' => '70°F', 'instructions' => 'Prime with corn sugar for bottle carbonation (or stabilize with sorbate/sulfite if backsweetening).']
+        ];
+    } elseif (stripos($bjcp['name'], 'Mead') !== false) {
+        $categoryName = 'Mead';
+        $ingredients = [
+            ['name' => 'Raw Clover / Wildflower Honey', 'ingredient_type' => 'Fermentable', 'amount' => 12.0, 'unit' => 'lbs', 'stage_addition' => 'Primary', 'notes' => 'Pure unpasteurized honey'],
+            ['name' => 'Spring / Filtered Water', 'ingredient_type' => 'Water', 'amount' => 4.0, 'unit' => 'Gal', 'stage_addition' => 'Primary', 'notes' => 'Dechlorinated spring water'],
+            ['name' => 'Fermaid-O Yeast Nutrient', 'ingredient_type' => 'Additive', 'amount' => 5.0, 'unit' => 'g', 'stage_addition' => 'Primary', 'notes' => 'TOSNA staggered addition'],
+            ['name' => 'Wine / Mead Yeast (Lalvin D-47 or 71B)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Rehydrated with Go-Ferm']
+        ];
+        $steps = [
+            ['step_number' => 1, 'phase' => 'Preparation', 'title' => 'Mix Must & Dissolve Honey', 'duration' => '30 mins', 'target_temp' => '70°F', 'instructions' => 'Warm water to 95°F to dissolve honey into must, aerate vigorously, and record Starting OG.'],
+            ['step_number' => 2, 'phase' => 'Primary', 'title' => 'Pitch Yeast & Staggered Nutrients', 'duration' => '7 days', 'target_temp' => '64°F - 68°F', 'instructions' => 'Add nutrients at 24h, 48h, 72h, and 1/3 sugar break.'],
+            ['step_number' => 3, 'phase' => 'Secondary', 'title' => 'Secondary Racking & Bulk Aging', 'duration' => '60 days', 'target_temp' => '60°F - 65°F', 'instructions' => 'Rack off yeast lees once clear and allow to age and mellow.']
+        ];
+    } elseif (stripos($bjcp['name'], 'Stout') !== false || stripos($bjcp['name'], 'Porter') !== false) {
+        $categoryName = 'Beer';
+        $ingredients = [
+            ['name' => 'Pale 2-Row / Maris Otter Malt', 'ingredient_type' => 'Fermentable', 'amount' => 9.0, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Base malt (75%)'],
+            ['name' => 'Roasted Barley (300L)', 'ingredient_type' => 'Fermentable', 'amount' => 1.0, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Provides dry coffee roast character'],
+            ['name' => 'Chocolate Malt (350L)', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds dark chocolate notes'],
+            ['name' => 'Flaked Barley / Oats', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Enhances body and creamy head retention'],
+            ['name' => 'East Kent Goldings / Fuggle Hops', 'ingredient_type' => 'Hop', 'amount' => 1.5, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '60 min bittering addition (~35 IBU)'],
+            ['name' => 'English Ale Yeast (WLP004 / S-04)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Pitch at 66°F']
+        ];
+        $steps = [
+            ['step_number' => 1, 'phase' => 'Mash/Steep', 'title' => 'Mash-In at 154°F', 'duration' => '60 mins', 'target_temp' => '154°F', 'instructions' => 'Strike grains with 3.75 gal of water at 165°F to achieve 154°F mash rest.'],
+            ['step_number' => 2, 'phase' => 'Boil', 'title' => '60-Minute Boil & Bittering Addition', 'duration' => '60 mins', 'target_temp' => '212°F', 'instructions' => 'Bring wort to rolling boil and add 1.5 oz hops at 60 mins.'],
+            ['step_number' => 3, 'phase' => 'Pitching', 'title' => 'Chill Wort & Inoculate Yeast', 'duration' => '20 mins', 'target_temp' => '66°F', 'instructions' => 'Rapidly chill to 66°F, aerate with oxygen/shaking, and pitch English ale yeast.'],
+            ['step_number' => 4, 'phase' => 'Primary', 'title' => 'Primary Fermentation', 'duration' => '10 days', 'target_temp' => '66°F - 68°F', 'instructions' => 'Ferment until specific gravity reaches final gravity.']
+        ];
+    } else {
+        $categoryName = 'Beer';
+        $ingredients = [
+            ['name' => 'American 2-Row Pale Malt', 'ingredient_type' => 'Fermentable', 'amount' => 10.5, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Base grain (85%)'],
+            ['name' => 'Crystal / Caramel 40L Malt', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds subtle sweetness and amber hue'],
+            ['name' => 'Munich / Vienna Malt', 'ingredient_type' => 'Fermentable', 'amount' => 0.75, 'unit' => 'lbs', 'stage_addition' => 'Mash', 'notes' => 'Adds malt depth and complexity'],
+            ['name' => 'Cascade / Centennial Hops (Bittering)', 'ingredient_type' => 'Hop', 'amount' => 1.0, 'unit' => 'oz', 'stage_addition' => 'Boil', 'notes' => '60 min addition'],
+            ['name' => 'Citra / Mosaic / Simcoe Hops (Aroma)', 'ingredient_type' => 'Hop', 'amount' => 1.5, 'unit' => 'oz', 'stage_addition' => 'Whirlpool', 'notes' => 'Flameout / Whirlpool at 180°F'],
+            ['name' => 'American Ale Yeast (US-05 / WLP001)', 'ingredient_type' => 'Yeast', 'amount' => 1.0, 'unit' => 'pkg', 'stage_addition' => 'Primary', 'notes' => 'Pitch at 67°F']
+        ];
+        $steps = [
+            ['step_number' => 1, 'phase' => 'Mash/Steep', 'title' => 'Single Infusion Mash at 152°F', 'duration' => '60 mins', 'target_temp' => '152°F', 'instructions' => 'Strike grains with 4.0 gal of strike water at 163°F to achieve 152°F rest.'],
+            ['step_number' => 2, 'phase' => 'Boil', 'title' => '60-Minute Boil & Hop Schedule', 'duration' => '60 mins', 'target_temp' => '212°F', 'instructions' => 'Add 1.0 oz bittering hops at 60 mins, 1.5 oz aroma hops at flameout/whirlpool.'],
+            ['step_number' => 3, 'phase' => 'Pitching', 'title' => 'Chill Wort & Pitch Yeast', 'duration' => '20 mins', 'target_temp' => '67°F', 'instructions' => 'Chill to 67°F, oxygenate wort, and pitch American ale yeast.'],
+            ['step_number' => 4, 'phase' => 'Primary', 'title' => 'Primary Fermentation & Dry Hop', 'duration' => '10 days', 'target_temp' => '67°F - 69°F', 'instructions' => 'Add dry hops on day 7 for 3-4 days before packaging.']
+        ];
+    }
+
+    $supplies = [
+        ['item_name' => 'Mash Tun / BIAB Brew Bag', 'category' => 'Equipment', 'quantity' => '1 unit', 'is_required' => 1, 'notes' => 'For grain mashing'],
+        ['item_name' => 'Boil Kettle & Immersion Chiller', 'category' => 'Equipment', 'quantity' => '1 unit', 'is_required' => 1, 'notes' => 'For boiling & rapid wort chilling'],
+        ['item_name' => 'Star San Sanitizer', 'category' => 'Supply', 'quantity' => '1 oz', 'is_required' => 1, 'notes' => 'No-rinse sanitizer for all cold-side gear']
+    ];
+
+    return [
+        'name'            => 'My ' . $bjcp['name'],
+        'style'           => $bjcp['name'],
+        'category'        => $categoryName,
+        'batch_size_gal'  => 5.0,
+        'target_pre_og'   => $targetPreOg,
+        'target_og'       => $targetOg,
+        'target_fg'       => $targetFg,
+        'target_abv'      => $targetAbv,
+        'ingredients'     => $ingredients,
+        'supplies'        => $supplies,
+        'steps'           => $steps
+    ];
+}
+

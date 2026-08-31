@@ -646,7 +646,7 @@ function authenticate_api_request() {
     }
 
     $db = get_db();
-    $stmt = $db->prepare("SELECT id, username, email, role, status, must_change_password FROM users WHERE api_token = ?");
+    $stmt = $db->prepare("SELECT id, username, email, role, status, must_change_password, api_token FROM users WHERE api_token = ?");
     $stmt->execute([$token]);
     $user = $stmt->fetch();
 

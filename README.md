@@ -83,8 +83,15 @@ A secure, multi-user PHP, HTML5, CSS3, and MariaDB SQL application designed for 
 13. **📄 Printable PDF Exporter (`export_pdf.php`)**:
     - Formatted PDF brew day logs and recipe summary printouts.
 
-14. **📱 Companion RESTful JSON API (`/api/v1/`)**:
-    - Mobile-ready API endpoints (`/api/v1/auth/login`, `/api/v1/batches`, `/api/v1/recipes`, `/api/v1/readings`).
+14. **📱 Comprehensive RESTful JSON API & OpenAPI 3.0 (`/api/v1/`)**:
+    - **Authentication**: `POST /auth/login` (with 2FA), `GET /auth/profile`, `POST /auth/token/regenerate`, `POST /auth/logout`.
+    - **Batches & Brew Logs**: Full CRUD (`GET`, `POST`, `PUT`, `DELETE` `/batches`) with status filtering (`Must Prep`, `Primary`, etc.), days active, and auto-inventory deduction.
+    - **Fermentation Telemetry & IoT**: `GET`, `POST`, `DELETE` `/readings` for live hydrometer drop curves (native integration support for **Tilt Hydrometer**, **iSpindel**, and **Rapt Pill**).
+    - **Recipe Formulations**: Full CRUD (`GET`, `POST`, `PUT`, `DELETE` `/recipes`) with structured ingredients, supplies, process steps, and BJCP target bounds.
+    - **Cellar Stock & Inventory**: Full CRUD (`GET`, `POST`, `PUT`, `DELETE` `/inventory`) with category filters and delta quantity adjustments (`adjust_quantity`).
+    - **BJCP Style Guidelines**: `GET /bjcp` and `GET /bjcp?style={name}` with guideline ranges, SRM hex codes, and auto-generated formulation starter templates.
+    - **Brewing Calculators Engine**: `POST /calculators/abv`, `POST /calculators/scale` (volume & efficiency scaling with water estimates), `POST /calculators/hydrometer-temp`, and `POST /calculators/priming-sugar`.
+    - **Interactive API Documentation & Explorer**: Built-in HTML API explorer and OpenAPI 3.0 JSON specification (`GET /api/v1/index.php?route=docs` or `?format=json`).
     - Secured by Bearer token authentication header (`Authorization: Bearer <api_token>`).
 
 15. **🛡️ Security Hardening**:
